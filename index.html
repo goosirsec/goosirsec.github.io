@@ -1,1 +1,332 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="./logo.png"><title>反洗钱系统</title><script defer="defer" src="./js/chunk-vendors.ecb83c2f.js"></script><script defer="defer" src="./js/app.61862e3f.js"></script><link href="./css/chunk-vendors.96ed8499.css" rel="stylesheet"><link href="./css/app.b8df5dcd.css" rel="stylesheet"></head><body><noscript><strong>此演示站点需要启用 JavaScript。</strong></noscript><div id="app"></div></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'none'; font-src 'self'; form-action 'self'; frame-src 'none'; worker-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="企业浏览器安全能力测试靶场：内置数据均为 MOCK，无后端，仅在本机浏览器处理。">
+  <title>反洗钱演示系统｜企业浏览器测试靶场</title>
+  <link rel="icon" href="./logo.png">
+  <link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <div class="mock-watermark" aria-hidden="true">MOCK · 模拟数据 · MOCK · 模拟数据</div>
+
+  <header class="topbar">
+    <button class="mobile-menu" id="mobileMenu" type="button" aria-label="打开导航" aria-expanded="false">☰</button>
+    <img src="./logo.png" width="36" height="36" alt="反洗钱演示系统标志">
+    <div class="brand">
+      <strong>反洗钱演示系统</strong>
+      <span>企业浏览器安全能力测试靶场</span>
+    </div>
+    <div class="topbar-badges" aria-label="环境状态">
+      <span class="badge badge-warning">MOCK 模拟数据</span>
+      <span class="badge">无后端</span>
+      <span class="badge">仅本机处理</span>
+      <span class="badge badge-warning" id="storageMode" hidden>内存模式 · 刷新会丢失</span>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="测试功能导航">
+      <nav>
+        <button class="nav-item is-active" data-view="customers" type="button"><span aria-hidden="true">▣</span>客户档案</button>
+        <button class="nav-item" data-view="exports" type="button"><span aria-hidden="true">⇩</span>导出与下载</button>
+        <button class="nav-item" data-view="clipboard" type="button"><span aria-hidden="true">▤</span>复制与粘贴</button>
+        <button class="nav-item" data-view="files" type="button"><span aria-hidden="true">⇧</span>文件与打印</button>
+        <button class="nav-item" data-view="permissions" type="button"><span aria-hidden="true">◎</span>浏览器权限</button>
+        <button class="nav-item" data-view="manual" type="button"><span aria-hidden="true">✓</span>人工验证清单</button>
+      </nav>
+      <div class="sidebar-note">
+        <strong>测试边界</strong>
+        <p>本站不会上传文件、读取剪贴板、记录坐标或保存摄像头/麦克风内容。</p>
+      </div>
+    </aside>
+
+    <main id="main-content" tabindex="-1">
+      <section class="notice" role="note" aria-label="重要测试说明">
+        <span aria-hidden="true">ⓘ</span>
+        <div><strong>内置数据均为 MOCK。</strong> 由程序合成且不来源于真实 KYC，但格式可能与公开编号空间重叠；禁止联系、支付或核验，禁止录入真实个人信息。</div>
+        <button class="link-button" type="button" data-view-link="manual">查看能力边界</button>
+      </section>
+
+      <section class="view is-active" id="view-customers" data-view-panel="customers" aria-labelledby="customersTitle">
+        <div class="page-heading">
+          <div>
+            <h1 id="customersTitle">客户档案</h1>
+            <p>用于验证企业浏览器对结构化测试信息的展示、复制、下载及打印控制。严格行政区或真实号段规则可能不命中安全 fixture。</p>
+          </div>
+          <div class="heading-actions">
+            <button class="btn btn-secondary" id="restoreData" type="button">恢复初始数据</button>
+            <button class="btn btn-primary" id="addCustomer" type="button">＋ 新增 KYC 测试记录</button>
+          </div>
+        </div>
+
+        <div class="card toolbar-card">
+          <form id="filterForm" class="filter-form" role="search">
+            <label>搜索
+              <input id="searchInput" type="search" placeholder="测试用户 / MOCK 公司 / 邮箱" autocomplete="off">
+            </label>
+            <label>风险等级
+              <select id="riskFilter">
+                <option value="">全部风险</option>
+                <option value="高">高风险</option>
+                <option value="中">中风险</option>
+                <option value="低">低风险</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" type="submit">查询</button>
+            <button class="btn btn-ghost" id="resetFilter" type="button">重置</button>
+          </form>
+          <div class="toolbar-actions">
+            <span id="selectionSummary" aria-live="polite">已选 0 条</span>
+            <button class="btn btn-secondary" id="toggleReveal" type="button" aria-pressed="false">临时显示敏感字段</button>
+            <button class="btn btn-secondary" id="undoDelete" type="button" disabled>撤销删除</button>
+            <button class="btn btn-primary" type="button" data-view-link="exports">导出所选</button>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="table-scroll">
+            <table>
+              <caption class="sr-only">模拟 KYC 客户记录。敏感字段默认脱敏。</caption>
+              <thead>
+                <tr>
+                  <th scope="col"><input id="selectPage" type="checkbox" aria-label="选择当前页全部客户"></th>
+                  <th scope="col">客户编号</th>
+                  <th scope="col">姓名</th>
+                  <th scope="col">风险</th>
+                  <th scope="col">证件号码</th>
+                  <th scope="col">手机号</th>
+                  <th scope="col">银行卡</th>
+                  <th scope="col">公司 / 职业</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="customerRows"></tbody>
+            </table>
+          </div>
+          <div id="emptyState" class="empty-state" hidden>
+            <strong>没有匹配的 MOCK 客户</strong>
+            <p>调整筛选条件，或恢复初始模拟数据。</p>
+          </div>
+          <div class="pagination">
+            <span id="resultCount">共 0 条</span>
+            <button class="btn btn-small" id="prevPage" type="button" aria-label="上一页">上一页</button>
+            <span id="pageStatus" aria-live="polite">第 1 / 1 页</span>
+            <button class="btn btn-small" id="nextPage" type="button" aria-label="下一页">下一页</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-exports" data-view-panel="exports" aria-labelledby="exportsTitle" hidden>
+        <div class="page-heading">
+          <div><h1 id="exportsTitle">导出与下载测试</h1><p>验证下载策略、内容识别、脱敏与未脱敏外发控制。</p></div>
+        </div>
+        <div class="metric-strip">
+          <div><span>当前已选</span><strong id="exportSelectionCount">0</strong></div>
+          <div><span>默认策略</span><strong>脱敏</strong></div>
+          <div><span>处理位置</span><strong>本机</strong></div>
+        </div>
+        <div class="card section-card">
+          <h2>结构化文件导出</h2>
+            <p class="section-help">未选择记录时使用当前筛选结果的前 10 条。默认导出会脱敏姓名及敏感字段；文件名包含 <code>KYC_TEST</code>。</p>
+          <div class="format-grid" id="maskedExports">
+            <button class="test-tile" data-export="csv" type="button"><strong>CSV</strong><span>表格型敏感数据</span></button>
+            <button class="test-tile" data-export="json" type="button"><strong>JSON</strong><span>结构化对象</span></button>
+            <button class="test-tile" data-export="txt" type="button"><strong>TXT</strong><span>组合 KYC 文本</span></button>
+            <button class="test-tile" data-export="html" type="button"><strong>HTML</strong><span>可打开的数据表</span></button>
+            <button class="test-tile" data-export="xml" type="button"><strong>XML</strong><span>标签化数据</span></button>
+            <button class="test-tile" data-export="pdf" type="button"><strong>PDF</strong><span>有效单页测试文档</span></button>
+            <button class="test-tile" data-export="png" type="button"><strong>证件 PNG</strong><span>Canvas 生成</span></button>
+          </div>
+        </div>
+        <div class="card danger-zone">
+          <div>
+            <h2>未脱敏导出测试</h2>
+            <p>用于验证高风险下载拦截。操作前会展示摘要，并要求输入确认词。</p>
+          </div>
+          <button class="btn btn-danger" id="rawExport" type="button">发起未脱敏 CSV 导出</button>
+        </div>
+        <div class="card section-card">
+          <h2>其他下载行为</h2>
+          <div class="button-row">
+            <button class="btn btn-secondary" id="downloadBlob" type="button">下载普通 Blob 文件</button>
+            <a class="btn btn-secondary" href="./TEST_MATRIX.md" download="MOCK_企业浏览器测试矩阵.md">下载测试矩阵</a>
+            <a class="btn btn-secondary" href="./README.md" target="_blank" rel="noopener noreferrer">新窗口打开说明</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-clipboard" data-view-panel="clipboard" aria-labelledby="clipboardTitle" hidden>
+        <div class="page-heading"><div><h1 id="clipboardTitle">复制与粘贴测试</h1><p>网页只写入剪贴板，不读取剪贴板。粘贴内容不会持久化。</p></div></div>
+        <div class="two-column">
+          <div class="card section-card">
+            <h2>复制 KYC 测试数据</h2>
+            <p class="section-help">以第一条已选记录（或当前结果第一条）生成测试内容；默认复制均脱敏姓名及敏感字段。</p>
+            <div class="button-stack">
+              <button class="btn btn-secondary copy-test" data-copy="idCard" type="button">复制脱敏证件号码</button>
+              <button class="btn btn-secondary copy-test" data-copy="kyc" type="button">复制脱敏组合 KYC 文本</button>
+              <button class="btn btn-secondary copy-test" data-copy="json" type="button">复制脱敏 JSON</button>
+              <button class="btn btn-secondary copy-test" data-copy="base64" type="button">复制脱敏 Base64</button>
+              <button class="btn btn-danger-outline" id="rawCopy" type="button">发起未脱敏组合 KYC 复制</button>
+              <button class="btn btn-secondary" id="clearClipboard" type="button">覆盖剪贴板为无敏感文本</button>
+              <button class="btn btn-primary" id="clipboardWriteTest" type="button">写入无敏感测试文本</button>
+            </div>
+            <output id="copyStatus" class="status-output" aria-live="polite">尚未执行复制测试</output>
+          </div>
+          <div class="card section-card">
+            <h2>手动粘贴区</h2>
+            <label for="pasteArea">在此粘贴内容（离开或刷新页面即丢弃）</label>
+            <textarea id="pasteArea" rows="12" placeholder="页面不会自动读取剪贴板，请使用键盘或菜单手动粘贴。"></textarea>
+            <div class="button-row"><button class="btn btn-secondary" id="clearPaste" type="button">清空粘贴区</button><span id="pasteCount">0 个字符</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-files" data-view-panel="files" aria-labelledby="filesTitle" hidden>
+        <div class="page-heading"><div><h1 id="filesTitle">文件、拖放与打印测试</h1><p>验证上传入口、拖放、打印和页面另存策略。</p></div></div>
+        <div class="two-column">
+          <div class="card section-card">
+            <h2>上传 / 拖放</h2>
+            <label class="drop-zone" id="dropZone" for="fileInput">
+              <strong>选择文件或拖放到这里</strong>
+              <span>只显示名称、大小、类型和修改时间；绝不读取或上传文件内容。</span>
+              <input id="fileInput" type="file" multiple>
+            </label>
+            <div id="fileMetadata" class="metadata-list" aria-live="polite"><p>尚未选择文件</p></div>
+            <button class="btn btn-secondary" id="clearFiles" type="button">清空文件元数据</button>
+          </div>
+          <div class="card section-card">
+            <h2>打印与窗口行为</h2>
+            <div class="button-stack">
+              <button class="btn btn-primary" id="printPage" type="button">打印 KYC 测试页</button>
+              <button class="btn btn-secondary" id="openWindow" type="button">打开同源测试窗口</button>
+              <a class="btn btn-secondary" id="externalLink" href="https://example.com/" target="_blank" rel="noopener noreferrer">打开外部测试链接</a>
+            </div>
+            <p class="section-help">“页面另存为”、截图及右键菜单需要在人工清单中验证，网页不能可靠判断结果。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-permissions" data-view-panel="permissions" aria-labelledby="permissionsTitle" hidden>
+        <div class="page-heading"><div><h1 id="permissionsTitle">浏览器权限测试</h1><p>每项操作都必须由你单击触发；本站不保留授权产生的内容。</p></div></div>
+        <div class="permission-grid">
+          <article class="card permission-card"><h2>通知</h2><p>请求网页通知权限，不发送后台推送。</p><button class="btn btn-secondary permission-test" data-permission="notification" type="button">请求通知权限</button><output id="status-notification">未测试</output></article>
+          <article class="card permission-card"><h2>地理位置</h2><p>只报告允许或拒绝，绝不显示或保存坐标。</p><button class="btn btn-secondary permission-test" data-permission="geolocation" type="button">请求位置权限</button><output id="status-geolocation">未测试</output></article>
+          <article class="card permission-card"><h2>摄像头</h2><p>授权后立即停止媒体轨道，不预览、不录制。</p><button class="btn btn-secondary permission-test" data-permission="camera" type="button">请求摄像头权限</button><output id="status-camera">未测试</output></article>
+          <article class="card permission-card"><h2>麦克风</h2><p>授权后立即停止媒体轨道，不监听、不录音。</p><button class="btn btn-secondary permission-test" data-permission="microphone" type="button">请求麦克风权限</button><output id="status-microphone">未测试</output></article>
+          <article class="card permission-card"><h2>剪贴板写入</h2><p>仅写入固定的无敏感测试文本，不读取。</p><button class="btn btn-secondary permission-test" data-permission="clipboard" type="button">测试剪贴板写入</button><output id="status-clipboard">未测试</output></article>
+          <article class="card permission-card"><h2>弹窗</h2><p>尝试打开同源小窗口，验证弹窗策略。</p><button class="btn btn-secondary permission-test" data-permission="popup" type="button">测试弹窗</button><output id="status-popup">未测试</output></article>
+          <article class="card permission-card"><h2>全屏</h2><p>请求页面进入全屏；再次按 Esc 可退出。</p><button class="btn btn-secondary permission-test" data-permission="fullscreen" type="button">请求全屏</button><output id="status-fullscreen">未测试</output></article>
+        </div>
+      </section>
+
+      <section class="view" id="view-manual" data-view-panel="manual" aria-labelledby="manualTitle" hidden>
+        <div class="page-heading"><div><h1 id="manualTitle">人工验证清单与测试日志</h1><p>以下能力无法由普通网页可靠检测，结果必须由测试人员在企业浏览器侧确认。</p></div></div>
+        <div class="two-column manual-layout">
+          <div class="card section-card">
+            <h2>人工验证清单</h2>
+            <div class="checklist" id="manualChecklist">
+              <label><input type="checkbox"> 截图是否被阻止、打水印或产生审计</label>
+              <label><input type="checkbox"> 页面打印是否被阻止或强制水印</label>
+              <label><input type="checkbox"> 页面另存为是否被限制</label>
+              <label><input type="checkbox"> 开发者工具是否被限制或产生告警</label>
+              <label><input type="checkbox"> 查看源代码是否被限制</label>
+              <label><input type="checkbox"> 右键菜单及选择文本是否按策略工作</label>
+              <label><input type="checkbox"> 浏览器水印是否包含正确的测试身份</label>
+              <label><input type="checkbox"> 未脱敏内容复制/下载是否被 DLP 识别</label>
+              <label><input type="checkbox"> 外部链接与新窗口是否符合访问策略</label>
+              <label><input type="checkbox"> 浏览器退出后本地站点数据是否按策略清理</label>
+            </div>
+            <p class="boundary-note"><strong>能力边界：</strong>网页无法可信判断截图、开发者工具、系统级水印、下载后的文件流转或浏览器审计后台是否记录成功。</p>
+          </div>
+          <div class="card section-card">
+            <h2>当前会话测试日志</h2>
+            <p class="section-help">只记录时间、测试类型和成功/拒绝状态，不记录姓名、证件号、文件名、坐标等原始数据。</p>
+            <div class="button-row"><button class="btn btn-secondary" id="exportLog" type="button">导出日志</button><button class="btn btn-danger-outline" id="clearLog" type="button">清空日志</button></div>
+            <ol id="activityLog" class="activity-log" aria-live="polite"></ol>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <aside class="drawer" id="detailDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" tabindex="-1" inert>
+    <div class="drawer-header"><div><span class="eyebrow">KYC 测试档案</span><h2 id="drawerTitle">客户详情</h2></div><button class="icon-button" id="closeDrawer" type="button" aria-label="关闭客户详情">×</button></div>
+    <div id="drawerContent" class="drawer-content"></div>
+  </aside>
+  <div class="scrim" id="drawerScrim" hidden></div>
+
+  <dialog id="customerDialog" aria-labelledby="customerDialogTitle">
+    <form method="dialog" id="customerForm">
+      <div class="dialog-header"><div><span class="eyebrow">仅保存至本机</span><h2 id="customerDialogTitle">新增 KYC 测试记录</h2></div><button class="icon-button" value="cancel" type="button" id="closeCustomer" aria-label="关闭">×</button></div>
+      <div class="dialog-body form-grid">
+        <p class="summary-box form-wide"><strong>禁止录入真实个人信息。</strong><br>页面无法判断用户输入是否真实；请仅使用组织批准的合成测试标识符。</p>
+        <input type="hidden" id="formId">
+        <label>姓名<input id="formName" required maxlength="40" placeholder="测试用户041"></label>
+        <label>风险等级<select id="formRisk" required><option value="低">低</option><option value="中">中</option><option value="高">高</option></select></label>
+        <label>身份证测试向量<input id="formIdCard" required maxlength="24" placeholder="使用组织批准的合成测试向量"></label>
+        <label>护照测试向量<input id="formPassport" required maxlength="18" placeholder="MOCK-PASS-041"></label>
+        <label>手机号测试向量<input id="formPhone" required maxlength="20" placeholder="000-TEST-0041"></label>
+        <label>邮箱<input id="formEmail" type="email" required maxlength="80" placeholder="mock041@example.test"></label>
+        <label>银行卡测试向量<input id="formBankCard" required maxlength="24" placeholder="4111111111111111（行业常用测试号）"></label>
+        <label>IBAN 测试向量<input id="formIban" required maxlength="40" placeholder="使用组织批准的测试向量"></label>
+        <label>SWIFT 测试向量<input id="formSwift" required maxlength="16" placeholder="MOCKZZZZ001"></label>
+        <label>公司<input id="formCompany" required maxlength="80" placeholder="MOCK 风控科技 041"></label>
+        <label>职业<input id="formOccupation" required maxlength="40" placeholder="测试工程师"></label>
+        <label class="form-wide">地址<input id="formAddress" required maxlength="120" placeholder="模拟市测试区示例路 41 号（MOCK）"></label>
+        <label class="form-wide confirmation-check"><input id="confirmMockOnly" type="checkbox" required> 我确认本次新增或编辑只包含合成测试信息，不含任何真实个人信息。</label>
+      </div>
+      <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" type="button" id="cancelCustomer">取消</button><button class="btn btn-primary" value="default" type="submit" id="saveCustomer" disabled>确认并保存到本机</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteDialog" aria-labelledby="deleteDialogTitle">
+    <form method="dialog">
+      <div class="dialog-header"><div><span class="eyebrow">软删除，可撤销</span><h2 id="deleteDialogTitle">确认删除这条测试记录？</h2></div></div>
+      <div class="dialog-body"><p id="deleteSummary">记录将从列表隐藏，但仍可通过“撤销删除”恢复。</p></div>
+      <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" type="button" id="cancelDelete">取消</button><button class="btn btn-danger" value="confirm" type="button" id="confirmDelete">确认软删除</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="rawExportDialog" aria-labelledby="rawExportTitle">
+    <form method="dialog" id="rawExportForm">
+      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawExportTitle">确认导出未脱敏测试数据</h2></div></div>
+      <div class="dialog-body">
+        <div id="rawExportSummary" class="summary-box"></div>
+        <label for="rawExportConfirm">请输入确认词：<strong>导出未脱敏测试数据</strong></label>
+        <input id="rawExportConfirm" autocomplete="off" required>
+        <p class="section-help">这只用于测试企业浏览器 DLP/下载限制，不代表真实系统的授权机制。</p>
+      </div>
+      <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" id="cancelRawExport" type="button">取消</button><button class="btn btn-danger" id="confirmRawExport" type="submit" disabled>确认并下载 CSV</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="rawCopyDialog" aria-labelledby="rawCopyTitle">
+    <form method="dialog" id="rawCopyForm">
+      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawCopyTitle">确认复制未脱敏测试数据</h2></div></div>
+      <div class="dialog-body">
+        <div id="rawCopySummary" class="summary-box"></div>
+        <label for="rawCopyConfirm">请输入确认词：<strong>复制未脱敏测试数据</strong></label>
+        <input id="rawCopyConfirm" autocomplete="off" required>
+        <p class="section-help">页面不会读取剪贴板。完成 DLP 测试后，请立即使用页面按钮或手动复制无敏感文本覆盖剪贴板。</p>
+      </div>
+      <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" id="cancelRawCopy" type="button">取消</button><button class="btn btn-danger" id="confirmRawCopy" type="submit" disabled>确认并复制</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="resetDialog" aria-labelledby="resetDialogTitle">
+    <form method="dialog">
+      <div class="dialog-header"><h2 id="resetDialogTitle">恢复 40 条初始 MOCK 数据？</h2></div>
+      <div class="dialog-body"><p>本机新增、编辑和软删除的模拟记录将被覆盖。测试日志不受影响。</p></div>
+      <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" type="button" id="cancelReset">取消</button><button class="btn btn-danger" value="confirm" type="button" id="confirmReset">恢复初始数据</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./assets/app.js" defer></script>
+</body>
+</html>
