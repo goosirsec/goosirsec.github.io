@@ -155,6 +155,10 @@ td input[type="checkbox"], th input[type="checkbox"] { width: 16px; min-height: 
 .detail-grid { display: grid; grid-template-columns: 135px 1fr; gap: 10px; }
 .detail-grid dt { color: var(--muted); }
 .detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.document-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.document-preview-grid figure { margin: 0; }
+.document-preview-grid canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #f6f9fd; }
+.document-preview-grid figcaption { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .scrim { position: fixed; z-index: 70; inset: 0; background: rgba(0, 10, 25, .5); }
 .icon-button { width: 36px; height: 36px; border: 0; border-radius: 50%; color: #334155; background: #eef2f7; font-size: 24px; cursor: pointer; }
 .eyebrow { display: block; color: var(--blue-700); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -200,6 +204,7 @@ dialog::backdrop { background: rgba(0, 10, 25, .55); }
   .toolbar-actions .btn { flex: 1 1 44%; }
   .metric-strip { grid-template-columns: 1fr; }
   .format-grid, .permission-grid { grid-template-columns: 1fr; }
+  .document-preview-grid { grid-template-columns: 1fr; }
   .permission-card { min-height: 180px; }
   .form-grid { grid-template-columns: 1fr; }
   .form-wide { grid-column: auto; }

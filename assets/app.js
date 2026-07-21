@@ -1,13 +1,13 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'aml-browser-lab:kyc:v3';
+  const STORAGE_KEY = 'aml-browser-lab:kyc:v4';
   const SESSION_LOG_KEY = 'aml-browser-lab:session-log:v1';
   const PAGE_SIZE = 10;
-  const RAW_CONFIRM_TEXT = '导出未脱敏测试数据';
-  const RAW_COPY_CONFIRM_TEXT = '复制未脱敏测试数据';
-  const MASKED_FIELDS = ['name', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address'];
-  const EXPORT_FIELDS = ['customerId', 'name', 'risk', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address', 'company', 'occupation'];
+  const RAW_CONFIRM_TEXT = '导出完整MOCK测试数据';
+  const RAW_COPY_CONFIRM_TEXT = '复制完整MOCK测试数据';
+  const MASKED_FIELDS = ['name', 'latinName', 'dateOfBirth', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address'];
+  const EXPORT_FIELDS = ['customerId', 'country', 'nationality', 'name', 'latinName', 'dateOfBirth', 'risk', 'idType', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address', 'company', 'occupation'];
 
   const state = {
     records: [],
@@ -15,8 +15,7 @@
     search: '',
     risk: '',
     page: 1,
-    revealUntil: 0,
-    revealTimer: null,
+    maskedPreview: false,
     lastDeletedId: null,
     deleteTargetId: null,
     drawerRecordId: null,
@@ -54,35 +53,57 @@
   }
 
   function createInitialRecords() {
-    const occupations = ['测试工程师', '合规专员', '产品经理', '财务分析师', '采购专员', '设计师', '运营经理', '数据分析师'];
-    const cities = ['模拟市测试区', '样例市演示区', '虚构市沙盒区', '测试市无真实区'];
+    const profiles = [
+      { country: '中国', nationality: '中国', name: '李明', latinName: 'LI MING', idType: '居民身份证', phone: (n) => `13800138${pad(n, 3)}`, id: (n) => { const body = `110101199001${pad(n, 2)}000`; return `${body}${chinaIdChecksum(body)}`; }, passport: (n) => `E0000${pad(n, 4)}`, address: (n) => `北京市朝阳区测试路 ${100 + n} 号`, swift: 'BKCHCNBJ' },
+      { country: '美国', nationality: '美国', name: 'Emma Carter', latinName: 'EMMA CARTER', idType: 'Social Security Number', phone: (n) => `+1 202-555-${pad(100 + n, 4)}`, id: (n) => `900-${pad(10 + n, 2)}-${pad(1000 + n, 4)}`, passport: (n) => `${pad(n, 9)}`, address: (n) => `${1200 + n} Example Avenue, Washington, DC 20001`, swift: 'BOFAUS3N' },
+      { country: '英国', nationality: '英国', name: 'Oliver Smith', latinName: 'OLIVER SMITH', idType: 'National Insurance Number', phone: (n) => `+44 7700 900${pad(n, 3)}`, id: (n) => `QQ ${pad(10 + n, 2)} ${pad(20 + n, 2)} ${pad(30 + n, 2)} C`, passport: (n) => `${pad(100000000 + n, 9)}`, address: (n) => `${10 + n} Example Road, London, SW1A 1AA`, swift: 'BARCGB22' },
+      { country: '德国', nationality: '德国', name: 'Lukas Weber', latinName: 'LUKAS WEBER', idType: 'Personalausweis', phone: (n) => `+49 30 0000 ${pad(n, 4)}`, id: (n) => `T2200012${n}`, passport: (n) => `C01X00${pad(n, 3)}`, address: (n) => `Musterstrasse ${10 + n}, 10115 Berlin`, swift: 'DEUTDEFF' },
+      { country: '法国', nationality: '法国', name: 'Camille Martin', latinName: 'CAMILLE MARTIN', idType: 'Numero de securite sociale', phone: (n) => `+33 1 99 00 00 ${pad(n, 2)}`, id: (n) => `1 90 01 99 ${pad(n, 3)} 000 00`, passport: (n) => `00FR${pad(n, 5)}`, address: (n) => `${10 + n} rue Exemple, 75001 Paris`, swift: 'BNPAFRPP' },
+      { country: '新加坡', nationality: '新加坡', name: 'Tan Wei Ming', latinName: 'TAN WEI MING', idType: 'NRIC', phone: (n) => `+65 0000 ${pad(n, 4)}`, id: (n) => `T00000${pad(n, 2)}I`, passport: (n) => `E000${pad(n, 5)}`, address: (n) => `${10 + n} Example Walk, Singapore 000000`, swift: 'DBSSSGSG' },
+      { country: '阿联酋', nationality: '阿联酋', name: 'Omar Al Mansoori', latinName: 'OMAR AL MANSOORI', idType: 'Emirates ID', phone: (n) => `+971 50 000 ${pad(n, 4)}`, id: (n) => `784-1990-${pad(1234500 + n, 7)}-1`, passport: (n) => `A000${pad(n, 5)}`, address: (n) => `Villa ${10 + n}, Example District, Dubai`, swift: 'EBILAEAD' },
+      { country: '土耳其', nationality: '土耳其', name: 'Ayse Yilmaz', latinName: 'AYSE YILMAZ', idType: 'T.C. Kimlik No', phone: (n) => `+90 555 000 ${pad(n, 4)}`, id: () => '10000000146', passport: (n) => `U00${pad(n, 6)}`, address: (n) => `Ornek Mahallesi No ${10 + n}, Istanbul`, swift: 'ISBKTRIS' },
+      { country: '印度', nationality: '印度', name: 'Arjun Mehta', latinName: 'ARJUN MEHTA', idType: 'Aadhaar', phone: (n) => `+91 00000 ${pad(n, 5)}`, id: (n) => `9999 9999 ${pad(n, 4)}`, passport: (n) => `Z000${pad(n, 4)}`, address: (n) => `${10 + n} Example Nagar, New Delhi 110000`, swift: 'SBININBB' },
+      { country: '日本', nationality: '日本', name: '佐藤 健', latinName: 'SATO KEN', idType: 'My Number', phone: (n) => `+81 90-0000-${pad(n, 4)}`, id: (n) => `0000 0000 ${pad(n, 4)}`, passport: (n) => `TR000${pad(n, 4)}`, address: (n) => `東京都千代田区テスト町 ${10 + n}`, swift: 'BOTKJPJT' },
+      { country: '韩国', nationality: '韩国', name: '김민수', latinName: 'KIM MIN SU', idType: 'Resident Registration Number', phone: (n) => `+82 10-0000-${pad(n, 4)}`, id: (n) => `900101-0000${pad(n, 3)}`, passport: (n) => `M000${pad(n, 5)}`, address: (n) => `서울특별시 테스트구 예제로 ${10 + n}`, swift: 'HVBKKRSE' },
+      { country: '巴西', nationality: '巴西', name: 'Ana Souza', latinName: 'ANA SOUZA', idType: 'CPF', phone: (n) => `+55 11 90000-${pad(n, 4)}`, id: () => '111.444.777-35', passport: (n) => `BR00${pad(n, 4)}`, address: (n) => `Rua Exemplo ${10 + n}, Sao Paulo - SP`, swift: 'BRASBRRJ' },
+      { country: '墨西哥', nationality: '墨西哥', name: 'Maria Gonzalez', latinName: 'MARIA GONZALEZ', idType: 'CURP', phone: (n) => `+52 55 0000 ${pad(n, 4)}`, id: () => 'GODE561231HDFRRN09', passport: (n) => `G00${pad(n, 6)}`, address: (n) => `Avenida Ejemplo ${10 + n}, Ciudad de Mexico`, swift: 'BCMRMXMM' },
+      { country: '加拿大', nationality: '加拿大', name: 'Emily Tremblay', latinName: 'EMILY TREMBLAY', idType: 'Social Insurance Number', phone: (n) => `+1 613-555-${pad(100 + n, 4)}`, id: () => '046 454 286', passport: (n) => `AB00${pad(n, 4)}`, address: (n) => `${10 + n} Example Street, Ottawa, ON K1A 0B1`, swift: 'ROYCCAT2' },
+      { country: '澳大利亚', nationality: '澳大利亚', name: 'Jack Wilson', latinName: 'JACK WILSON', idType: 'Tax File Number', phone: (n) => `+61 491 570 ${pad(100 + n, 3)}`, id: () => '123 456 782', passport: (n) => `N00${pad(n, 6)}`, address: (n) => `${10 + n} Example Circuit, Canberra ACT 2600`, swift: 'CTBAAU2S' },
+      { country: '巴拿马', nationality: '巴拿马', name: 'Carlos Rodriguez', latinName: 'CARLOS RODRIGUEZ', idType: 'Cedula', phone: (n) => `+507 0000-${pad(n, 4)}`, id: (n) => `8-888-${pad(8800 + n, 4)}`, passport: (n) => `PA00${pad(n, 4)}`, address: (n) => `Calle Ejemplo ${10 + n}, Ciudad de Panama`, swift: 'NAPAPAPA' },
+    ];
+    const occupations = ['Security Analyst', 'Compliance Officer', 'Product Manager', 'Financial Analyst', 'Procurement Specialist', 'Designer', 'Operations Manager', 'Data Analyst'];
     const risks = ['低', '低', '中', '低', '高', '中', '低', '中'];
-    return Array.from({ length: 40 }, (_, index) => {
+    const testCards = ['4111111111111111', '4242424242424242', '5555555555554444', '4000056655665556'];
+    const testIbans = ['GB82WEST12345698765432', 'DE89370400440532013000', 'FR1420041010050500013M02606', 'AE070331234567890123456'];
+    return Array.from({ length: 48 }, (_, index) => {
       const number = index + 1;
-      const month = pad((index % 12) + 1);
-      const day = pad((index % 27) + 1);
-      const sequence = pad(100 + number, 3);
-      const idBody = `9900001990${month}${day}${sequence}`;
+      const profile = profiles[index % profiles.length];
+      const sequence = Math.floor(index / profiles.length) + 1;
       return {
         customerId: `MOCK-KYC-${pad(number, 3)}`,
-        name: `测试用户${pad(number, 3)}`,
+        country: profile.country,
+        nationality: profile.nationality,
+        name: profile.name,
+        latinName: profile.latinName,
+        dateOfBirth: `1990-${pad((index % 12) + 1)}-${pad((index % 27) + 1)}`,
         risk: risks[index % risks.length],
-        idCard: `${idBody}${chinaIdChecksum(idBody)}`,
-        passport: `MOCK-PASS-${pad(number, 3)}`,
-        phone: `000-TEST-${pad(number, 4)}`,
-        email: `mock.kyc.${pad(number, 3)}@example.test`,
-        bankCard: '4111111111111111',
-        iban: 'GB82WEST12345698765432',
-        swift: `MOCKZZZZ${pad(number, 3)}`,
-        address: `${cities[index % cities.length]}示例路 ${number} 号（MOCK）`,
-        company: `MOCK 风控科技 ${pad((index % 10) + 1, 2)} 公司`,
+        idType: profile.idType,
+        idCard: profile.id(sequence),
+        passport: profile.passport(sequence),
+        phone: profile.phone(sequence),
+        email: `${profile.latinName.toLowerCase().replaceAll(' ', '.')}.${sequence}@example.com`,
+        bankCard: testCards[index % testCards.length],
+        iban: testIbans[index % testIbans.length],
+        swift: profile.swift,
+        address: profile.address(sequence),
+        company: `${profile.country} Example Holdings ${sequence}`,
         occupation: occupations[index % occupations.length],
         createdAt: `2026-07-${pad((index % 20) + 1)}T09:${pad(index % 60)}:00+08:00`,
         updatedAt: `2026-07-${pad((index % 20) + 1)}T09:${pad(index % 60)}:00+08:00`,
         deletedAt: null,
         mock: true,
         source: 'builtin-mock',
-        schemaVersion: 3,
+        schemaVersion: 4,
       };
     });
   }
@@ -90,7 +111,7 @@
   function validStoredRecords(value) {
     return Array.isArray(value) && value.every((item) => item
       && typeof item.customerId === 'string'
-      && item.schemaVersion === 3
+      && item.schemaVersion === 4
       && ['builtin-mock', 'user-confirmed-test'].includes(item.source));
   }
 
@@ -205,7 +226,7 @@
     return text.length > 6 ? `${text.slice(0, 2)}***${text.slice(-2)}` : '***';
   }
 
-  function presentRecord(record, masked = true) {
+  function presentRecord(record, masked = false) {
     return Object.fromEntries(EXPORT_FIELDS.map((field) => [field, masked && MASKED_FIELDS.includes(field) ? maskValue(field, record[field]) : record[field]]));
   }
 
@@ -220,7 +241,23 @@
   function filteredRecords() {
     const term = state.search.trim().toLowerCase();
     return activeRecords().filter((record) => {
-      const searchMatch = !term || [record.customerId, record.name, record.company, record.email, record.phone]
+      const searchMatch = !term || [
+        record.customerId,
+        record.country,
+        record.nationality,
+        record.name,
+        record.latinName,
+        record.idType,
+        record.idCard,
+        record.passport,
+        record.phone,
+        record.email,
+        record.bankCard,
+        record.iban,
+        record.swift,
+        record.address,
+        record.company,
+      ]
         .some((value) => String(value).toLowerCase().includes(term));
       const riskMatch = !state.risk || record.risk === state.risk;
       return searchMatch && riskMatch;
@@ -234,7 +271,7 @@
   }
 
   function isRevealed() {
-    return Date.now() < state.revealUntil;
+    return !state.maskedPreview;
   }
 
   function riskClass(risk) {
@@ -248,7 +285,8 @@
       <tr>
         <td><input class="row-select" type="checkbox" data-id="${escapeHtml(record.customerId)}" aria-label="选择 ${escapeHtml(record.name)}" ${state.selected.has(record.customerId) ? 'checked' : ''}></td>
         <td class="mono">${escapeHtml(record.customerId)}</td>
-        <td><span class="customer-name"><strong>${escapeHtml(record.name)}</strong><span>${record.source === 'builtin-mock' ? '内置 MOCK' : '用户确认测试数据'}</span></span></td>
+        <td><span class="customer-name"><strong>${escapeHtml(record.name)}</strong><span>${escapeHtml(record.latinName || '')}</span></span></td>
+        <td><strong>${escapeHtml(record.country || '自定义')}</strong><br><span class="section-help">${escapeHtml(record.idType || '身份标识')}</span></td>
         <td><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></td>
         <td class="mono">${escapeHtml(reveal ? record.idCard : maskValue('idCard', record.idCard))}</td>
         <td class="mono">${escapeHtml(reveal ? record.phone : maskValue('phone', record.phone))}</td>
@@ -366,12 +404,15 @@
     const reveal = isRevealed();
     const sensitive = (field) => escapeHtml(reveal ? record[field] : maskValue(field, record[field]));
     $('#drawerContent').innerHTML = `
-      <div class="summary-box"><strong>${record.source === 'builtin-mock' ? '内置 MOCK 数据' : '用户确认的本机测试数据'} / 无后端</strong><br>${record.source === 'builtin-mock' ? '由程序合成且不来源于真实 KYC；格式可能与公开编号空间重叠，禁止联系、支付或核验。' : '此档案来自用户输入，页面不验证其真实性；录入者已确认只使用获批测试信息。'}</div>
-      <div class="button-row"><button class="btn btn-secondary" id="drawerReveal" type="button">${reveal ? '敏感字段将在短时间后自动隐藏' : '临时显示敏感字段 30 秒'}</button><button class="btn btn-secondary copy-record" data-id="${escapeHtml(id)}" type="button">复制脱敏组合 KYC</button></div>
-      <section class="detail-section"><h3>基本信息</h3><dl class="detail-grid"><dt>客户编号</dt><dd>${escapeHtml(record.customerId)}</dd><dt>姓名</dt><dd>${escapeHtml(record.name)}</dd><dt>风险等级</dt><dd><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></dd><dt>公司</dt><dd>${escapeHtml(record.company)}</dd><dt>职业</dt><dd>${escapeHtml(record.occupation)}</dd></dl></section>
-      <section class="detail-section"><h3>身份与联系方式</h3><dl class="detail-grid"><dt>身份证</dt><dd class="mono">${sensitive('idCard')}</dd><dt>护照</dt><dd class="mono">${sensitive('passport')}</dd><dt>手机号</dt><dd class="mono">${sensitive('phone')}</dd><dt>邮箱</dt><dd>${sensitive('email')}</dd><dt>地址</dt><dd>${sensitive('address')}</dd></dl></section>
+      <div class="summary-box"><strong>${record.source === 'builtin-mock' ? '高拟真合成 MOCK 数据' : '用户确认的本机测试数据'} / 无后端</strong><br>${record.source === 'builtin-mock' ? '完整字段用于企业浏览器 DLP、OCR、复制和下载识别；不来源于真实 KYC，禁止联系、支付或核验。' : '此档案来自用户输入，页面不验证其真实性；录入者已确认只使用获批测试信息。'}</div>
+      <div class="button-row"><button class="btn btn-secondary" id="drawerReveal" type="button">${reveal ? '切换为脱敏预览' : '恢复完整明文数据'}</button><button class="btn btn-secondary copy-record" data-id="${escapeHtml(id)}" type="button">复制完整组合 KYC</button></div>
+      <section class="detail-section"><h3>基本信息</h3><dl class="detail-grid"><dt>客户编号</dt><dd>${escapeHtml(record.customerId)}</dd><dt>国家 / 地区</dt><dd>${escapeHtml(record.country || '自定义')}</dd><dt>姓名</dt><dd>${escapeHtml(record.name)}</dd><dt>拉丁姓名</dt><dd>${escapeHtml(record.latinName || '')}</dd><dt>出生日期</dt><dd>${sensitive('dateOfBirth')}</dd><dt>风险等级</dt><dd><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></dd><dt>公司</dt><dd>${escapeHtml(record.company)}</dd><dt>职业</dt><dd>${escapeHtml(record.occupation)}</dd></dl></section>
+      <section class="detail-section"><h3>身份与联系方式</h3><dl class="detail-grid"><dt>证件类型</dt><dd>${escapeHtml(record.idType || '身份标识')}</dd><dt>证件号码</dt><dd class="mono">${sensitive('idCard')}</dd><dt>护照号码</dt><dd class="mono">${sensitive('passport')}</dd><dt>手机号</dt><dd class="mono">${sensitive('phone')}</dd><dt>邮箱</dt><dd>${sensitive('email')}</dd><dt>地址</dt><dd>${sensitive('address')}</dd></dl></section>
       <section class="detail-section"><h3>金融标识</h3><dl class="detail-grid"><dt>银行卡</dt><dd class="mono">${sensitive('bankCard')}</dd><dt>IBAN</dt><dd class="mono">${sensitive('iban')}</dd><dt>SWIFT</dt><dd class="mono">${sensitive('swift')}</dd></dl></section>
+      <section class="detail-section"><h3>MOCK 证件图片（OCR 测试）</h3><div class="document-preview-grid"><figure><canvas id="drawerIdCanvas" data-document-canvas="id" width="1000" height="630" aria-label="完整 MOCK 身份证件图片"></canvas><figcaption>${escapeHtml(record.country)} ${escapeHtml(record.idType)} · 完整测试字段</figcaption></figure><figure><canvas id="drawerPassportCanvas" data-document-canvas="passport" width="1000" height="630" aria-label="完整 MOCK 护照图片"></canvas><figcaption>${escapeHtml(record.country)} Passport · 完整测试字段</figcaption></figure></div></section>
     `;
+    drawDocumentCanvas($('[data-document-canvas="id"]', $('#drawerContent')), record, 'id', !reveal);
+    drawDocumentCanvas($('[data-document-canvas="passport"]', $('#drawerContent')), record, 'passport', !reveal);
     $('#drawerScrim').hidden = false;
     $('#detailDrawer').inert = false;
     $('#detailDrawer').classList.add('is-open');
@@ -392,27 +433,23 @@
   }
 
   function startReveal() {
-    state.revealUntil = Date.now() + 30000;
-    $('#toggleReveal').textContent = '敏感字段已显示（30 秒）';
-    $('#toggleReveal').setAttribute('aria-pressed', 'true');
-    window.clearTimeout(state.revealTimer);
-    state.revealTimer = window.setTimeout(() => {
-      state.revealUntil = 0;
-      $('#toggleReveal').textContent = '临时显示敏感字段';
-      $('#toggleReveal').setAttribute('aria-pressed', 'false');
-      renderTable();
-      if (state.drawerRecordId) openDrawer(state.drawerRecordId);
-      showToast('敏感字段已自动恢复脱敏显示');
-    }, 30000);
+    state.maskedPreview = !state.maskedPreview;
+    $('#toggleReveal').textContent = state.maskedPreview ? '恢复完整明文数据' : '切换脱敏预览';
+    $('#toggleReveal').setAttribute('aria-pressed', String(state.maskedPreview));
     renderTable();
     if (state.drawerRecordId) openDrawer(state.drawerRecordId);
-    addLog('临时显示模拟敏感字段', '30 秒');
+    addLog('切换 KYC 展示模式', state.maskedPreview ? '脱敏预览' : '完整明文');
   }
 
   function openCustomerDialog(record = null) {
     $('#customerDialogTitle').textContent = record ? '编辑 KYC 测试记录' : '新增 KYC 测试记录';
     $('#formId').value = record?.customerId || '';
     $('#formName').value = record?.name || '';
+    $('#formLatinName').value = record?.latinName || '';
+    $('#formCountry').value = record?.country || '';
+    $('#formNationality').value = record?.nationality || '';
+    $('#formDateOfBirth').value = record?.dateOfBirth || '';
+    $('#formIdType').value = record?.idType || '';
     $('#formRisk').value = record?.risk || '低';
     $('#formIdCard').value = record?.idCard || '';
     $('#formPassport').value = record?.passport || '';
@@ -435,12 +472,17 @@
     const nextNumber = state.records.reduce((max, item) => {
       const match = item.customerId.match(/(\d+)$/);
       return Math.max(max, match ? Number(match[1]) : 0);
-    }, 40) + 1;
+    }, 48) + 1;
     const now = new Date().toISOString();
     return {
       customerId: existing?.customerId || `MOCK-KYC-${pad(nextNumber, 3)}`,
+      country: $('#formCountry').value.trim(),
+      nationality: $('#formNationality').value.trim(),
       name: $('#formName').value.trim(),
+      latinName: $('#formLatinName').value.trim(),
+      dateOfBirth: $('#formDateOfBirth').value,
       risk: $('#formRisk').value,
+      idType: $('#formIdType').value.trim(),
       idCard: $('#formIdCard').value.trim(),
       passport: $('#formPassport').value.trim(),
       phone: $('#formPhone').value.trim(),
@@ -456,7 +498,7 @@
       deletedAt: existing?.deletedAt || null,
       mock: false,
       source: 'user-confirmed-test',
-      schemaVersion: 3,
+      schemaVersion: 4,
     };
   }
 
@@ -584,15 +626,15 @@
 
   function createPdf(records) {
     const lines = [
-      'KYC TEST EXPORT - BUILT-IN DATA IS MOCK',
+      'KYC HIGH-FIDELITY TEST EXPORT - SYNTHETIC MOCK DATA',
       'USER INPUT IS NOT VERIFIED - NEVER USE REAL PII',
       `Generated: ${new Date().toISOString()}`,
-      `Records: ${records.length} (masked)`,
+      `Records: ${records.length} (full test fields)`,
       '',
       ...records.slice(0, 18).map((record) => {
-        const item = presentRecord(record, true);
+        const item = presentRecord(record, false);
         const risk = record.risk === '高' ? 'HIGH' : record.risk === '中' ? 'MEDIUM' : 'LOW';
-        return `${item.customerId} | TEST USER | ${risk} | ${item.idCard} | ${item.phone}`;
+        return `${item.country} | ${item.latinName} | ${risk} | ${item.idType}: ${item.idCard} | P: ${item.passport}`;
       }),
     ];
     const textOps = lines.map((line, index) => `BT /F1 ${index === 0 ? 15 : 9} Tf 48 ${790 - (index * 27)} Td (${pdfEscape(pdfAscii(line))}) Tj ET`).join('\n');
@@ -616,56 +658,70 @@
     return new Blob([pdf], { type: 'application/pdf' });
   }
 
-  async function exportPng(record) {
+  function drawDocumentCanvas(canvas, record, kind = 'id', masked = false) {
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return false;
+    const value = (field) => masked && MASKED_FIELDS.includes(field) ? maskValue(field, record[field]) : String(record[field] ?? '');
+    const isPassport = kind === 'passport';
+    ctx.fillStyle = isPassport ? '#f8f3e8' : '#f6f9fd';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = isPassport ? '#582c2c' : '#0b1728';
+    ctx.fillRect(0, 0, canvas.width, 110);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 34px sans-serif';
+    ctx.fillText(isPassport ? `PASSPORT / ${record.country}` : `${record.country} / ${record.idType}`, 48, 66);
+    ctx.strokeStyle = isPassport ? '#9b6b43' : '#155eef';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(42, 145, 916, 410);
+    ctx.fillStyle = '#d7deea';
+    ctx.fillRect(72, 185, 210, 275);
+    ctx.fillStyle = '#667085';
+    ctx.fillRect(125, 235, 105, 105);
+    ctx.fillRect(102, 350, 150, 80);
+    ctx.fillStyle = '#172033';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText(value('name'), 330, 215);
+    ctx.font = '22px monospace';
+    ctx.fillText(`NAME: ${value('latinName')}`, 330, 260);
+    ctx.fillText(`DOB: ${value('dateOfBirth')}`, 330, 305);
+    ctx.fillText(`${isPassport ? 'PASSPORT' : record.idType}: ${value(isPassport ? 'passport' : 'idCard')}`, 330, 350);
+    ctx.fillText(`NATIONALITY: ${record.nationality}`, 330, 395);
+    ctx.fillText(`PHONE: ${value('phone')}`, 330, 440);
+    ctx.fillText(`CUSTOMER: ${record.customerId}`, 330, 485);
+    ctx.save();
+    ctx.translate(680, 535);
+    ctx.rotate(-0.18);
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#b42318';
+    ctx.font = 'bold 58px sans-serif';
+    ctx.fillText('SYNTHETIC MOCK', -230, 0);
+    ctx.restore();
+    return true;
+  }
+
+  async function exportPng(record, kind = 'id') {
     const canvas = document.createElement('canvas');
     canvas.width = 1000;
     canvas.height = 630;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      addLog('下载脱敏 PNG 文件', '失败：Canvas 不可用');
+    if (!drawDocumentCanvas(canvas, record, kind, false)) {
+      addLog('下载完整 MOCK PNG 文件', '失败：Canvas 不可用');
       showToast('PNG 生成失败：浏览器未提供 Canvas 绘图能力');
       return false;
     }
-    ctx.fillStyle = '#f6f9fd';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#0b1728';
-    ctx.fillRect(0, 0, canvas.width, 110);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 38px sans-serif';
-    ctx.fillText(record.source === 'builtin-mock' ? 'MOCK KYC IDENTIFICATION' : 'KYC TEST / USER INPUT', 50, 68);
-    ctx.strokeStyle = '#155eef';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(42, 145, 916, 410);
-    ctx.fillStyle = '#172033';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText(`Name: ${maskValue('name', record.name)}`, 80, 225);
-    ctx.font = '24px monospace';
-    ctx.fillText(`ID: ${maskValue('idCard', record.idCard)}`, 80, 290);
-    ctx.fillText(`Passport: ${maskValue('passport', record.passport)}`, 80, 345);
-    ctx.fillText(`Customer: ${record.customerId}`, 80, 400);
-    ctx.fillText(`Risk: ${record.risk}`, 80, 455);
-    ctx.save();
-    ctx.translate(710, 500);
-    ctx.rotate(-0.23);
-    ctx.globalAlpha = 0.22;
-    ctx.fillStyle = '#b42318';
-    ctx.font = 'bold 64px sans-serif';
-    ctx.fillText(record.source === 'builtin-mock' ? '模拟数据' : '测试数据', -120, 0);
-    ctx.restore();
     return new Promise((resolve) => {
       try {
         canvas.toBlob((blob) => {
           if (!blob) {
-            addLog('下载脱敏 PNG 文件', '失败：Canvas 编码返回空结果');
+            addLog('下载完整 MOCK PNG 文件', '失败：Canvas 编码返回空结果');
             showToast('PNG 生成失败：浏览器未返回图片数据');
             resolve(false);
             return;
           }
-          downloadBlob(blob, 'image/png', `KYC_TEST_ID_${record.customerId}_${dateStamp()}.png`);
+          downloadBlob(blob, 'image/png', `KYC_MOCK_${kind === 'passport' ? 'PASSPORT' : 'ID'}_${record.country}_${record.customerId}_${dateStamp()}.png`);
           resolve(true);
         }, 'image/png');
       } catch (error) {
-        addLog('下载脱敏 PNG 文件', `失败：${error?.name || 'Error'}`);
+        addLog('下载完整 MOCK PNG 文件', `失败：${error?.name || 'Error'}`);
         showToast('PNG 生成失败：浏览器拒绝 Canvas 编码');
         resolve(false);
       }
@@ -678,16 +734,17 @@
       showToast('没有可导出的测试记录');
       return;
     }
-    const base = `KYC_TEST_MASKED_${records.length}_${dateStamp()}`;
-    if (format === 'csv') downloadBlob(toCsv(records, true), 'text/csv;charset=utf-8', `${base}.csv`);
-    if (format === 'json') downloadBlob(JSON.stringify({ builtInDataIsMock: true, userInputVerified: false, masked: true, records: records.map((record) => ({ source: record.source, ...presentRecord(record, true) })) }, null, 2), 'application/json', `${base}.json`);
-    if (format === 'txt') downloadBlob(toTxt(records, true), 'text/plain;charset=utf-8', `${base}.txt`);
-    if (format === 'html') downloadBlob(toHtml(records, true), 'text/html;charset=utf-8', `${base}.html`);
-    if (format === 'xml') downloadBlob(toXml(records, true), 'application/xml;charset=utf-8', `${base}.xml`);
+    const base = `KYC_MOCK_FULL_${records.length}_${dateStamp()}`;
+    if (format === 'csv') downloadBlob(toCsv(records, false), 'text/csv;charset=utf-8', `${base}.csv`);
+    if (format === 'json') downloadBlob(JSON.stringify({ builtInDataIsMock: true, userInputVerified: false, masked: false, records: records.map((record) => ({ source: record.source, ...presentRecord(record, false) })) }, null, 2), 'application/json', `${base}.json`);
+    if (format === 'txt') downloadBlob(toTxt(records, false), 'text/plain;charset=utf-8', `${base}.txt`);
+    if (format === 'html') downloadBlob(toHtml(records, false), 'text/html;charset=utf-8', `${base}.html`);
+    if (format === 'xml') downloadBlob(toXml(records, false), 'application/xml;charset=utf-8', `${base}.xml`);
     if (format === 'pdf') downloadBlob(createPdf(records), 'application/pdf', `${base}.pdf`);
-    if (format === 'png' && !await exportPng(records[0])) return;
-    addLog(`下载脱敏 ${format.toUpperCase()} 文件`, `记录数 ${records.length}`);
-    showToast(`已触发 ${format.toUpperCase()} 脱敏测试文件下载`);
+    if (format === 'id-png' && !await exportPng(records[0], 'id')) return;
+    if (format === 'passport-png' && !await exportPng(records[0], 'passport')) return;
+    addLog(`下载完整 MOCK ${format.toUpperCase()} 文件`, `记录数 ${records.length}`);
+    showToast(`已触发 ${format.toUpperCase()} 完整 MOCK 测试文件下载`);
   }
 
   function openRawExportDialog() {
@@ -709,8 +766,8 @@
     const records = exportRecords();
     downloadBlob(toCsv(records, false), 'text/csv;charset=utf-8', `KYC_TEST_UNMASKED_HIGH_RISK_${records.length}_${dateStamp()}.csv`);
     closeDialog($('#rawExportDialog'));
-    addLog('下载未脱敏测试 CSV', `高风险确认，记录数 ${records.length}`);
-    showToast('已触发未脱敏测试 CSV 下载');
+    addLog('下载完整高拟真 MOCK CSV', `高风险确认，记录数 ${records.length}`);
+    showToast('已触发完整高拟真 MOCK CSV 下载');
   }
 
   function utf8Base64(text) {
@@ -729,10 +786,10 @@
     try {
       await navigator.clipboard.writeText(text);
       $('#copyStatus').textContent = raw
-        ? `${action}：写入成功。测试后请立即单击“覆盖剪贴板”，或手动复制无敏感内容覆盖。`
-        : `${action}：写入剪贴板成功（默认已脱敏，内容未被本站保存）`;
+        ? `${action}：完整 MOCK 字段写入成功。测试后可单击“覆盖剪贴板”。`
+        : `${action}：脱敏预览内容写入成功。`;
       addLog(action, '允许');
-      showToast(raw ? '未脱敏测试内容已写入；测试后请立即覆盖剪贴板' : '脱敏测试内容已写入剪贴板');
+      showToast(raw ? '完整 MOCK 测试内容已写入剪贴板' : '脱敏预览内容已写入剪贴板');
       return true;
     } catch (error) {
       $('#copyStatus').textContent = `${action}：被浏览器拒绝或不可用`;
@@ -749,7 +806,7 @@
     return utf8Base64(JSON.stringify({ builtInMock: record.source === 'builtin-mock', masked, ...presentRecord(record, masked) }));
   }
 
-  async function performCopy(kind, masked = true, explicitId = null) {
+  async function performCopy(kind, masked = false, explicitId = null) {
     const record = explicitId ? customerById(explicitId) : copySourceRecord();
     if (!record) {
       showToast('没有可用于复制的测试记录');
@@ -761,7 +818,7 @@
       json: 'KYC JSON',
       base64: 'KYC Base64',
     };
-    const action = `复制${masked ? '脱敏' : '未脱敏'} ${labels[kind] || '测试数据'}`;
+    const action = `复制${masked ? '脱敏预览' : '完整 MOCK'} ${labels[kind] || '测试数据'}`;
     await copyText(copyPayload(record, kind, masked), action, !masked);
   }
 
@@ -772,7 +829,7 @@
       return;
     }
     state.rawCopyKind = kind;
-    $('#rawCopySummary').innerHTML = `<strong>复制摘要</strong><br>记录：${escapeHtml(record.customerId)}<br>内容：未脱敏组合 KYC 文本<br>来源：${record.source === 'builtin-mock' ? '内置 MOCK' : '用户确认的测试数据'}<br>测试后请立即覆盖剪贴板。`;
+    $('#rawCopySummary').innerHTML = `<strong>复制摘要</strong><br>记录：${escapeHtml(record.customerId)}<br>内容：完整高拟真组合 KYC 文本<br>来源：${record.source === 'builtin-mock' ? '内置 MOCK' : '用户确认的测试数据'}<br>测试后可使用页面按钮覆盖剪贴板。`;
     $('#rawCopyConfirm').value = '';
     $('#confirmRawCopy').disabled = true;
     showDialog($('#rawCopyDialog'), '#cancelRawCopy');
@@ -941,7 +998,7 @@
     $('#drawerScrim').addEventListener('click', closeDrawer);
     $('#drawerContent').addEventListener('click', (event) => {
       if (event.target.id === 'drawerReveal') startReveal();
-      if (event.target.matches('.copy-record')) performCopy('kyc', true, event.target.dataset.id);
+      if (event.target.matches('.copy-record')) performCopy('kyc', false, event.target.dataset.id);
     });
     $('#addCustomer').addEventListener('click', () => openCustomerDialog());
     $('#confirmMockOnly').addEventListener('change', (event) => { $('#saveCustomer').disabled = !event.target.checked; });
@@ -962,8 +1019,8 @@
       const persisted = saveRecords();
       state.page = 1;
       renderTable();
-      addLog('恢复初始 MOCK 数据', persisted ? '40 条' : '40 条，仅当前会话');
-      showToast(persisted ? '已恢复 40 条初始 MOCK 数据' : '已恢复 40 条数据；仅当前页内存模式，刷新会丢失');
+      addLog('恢复初始 MOCK 数据', persisted ? '48 条' : '48 条，仅当前会话');
+      showToast(persisted ? '已恢复 48 条多国家初始 MOCK 数据' : '已恢复 48 条数据；仅当前页内存模式，刷新会丢失');
       closeDialog($('#resetDialog'));
     });
 
@@ -980,7 +1037,7 @@
       addLog('普通 Blob 下载', '触发');
     });
 
-    $$('.copy-test').forEach((button) => button.addEventListener('click', () => performCopy(button.dataset.copy, true)));
+    $$('.copy-test').forEach((button) => button.addEventListener('click', () => performCopy(button.dataset.copy, false)));
     $('#rawCopy').addEventListener('click', () => openRawCopyDialog('kyc'));
     $('#rawCopyConfirm').addEventListener('input', (event) => { $('#confirmRawCopy').disabled = event.target.value !== RAW_COPY_CONFIRM_TEXT; });
     $('#cancelRawCopy').addEventListener('click', () => { state.rawCopyKind = null; closeDialog($('#rawCopyDialog')); });
@@ -1065,6 +1122,7 @@
       createInitialRecords,
       csvCell,
       exportPng,
+      drawDocumentCanvas,
       maskValue,
       pdfAscii,
       presentRecord,

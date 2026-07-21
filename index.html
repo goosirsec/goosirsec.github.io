@@ -48,7 +48,7 @@
     <main id="main-content" tabindex="-1">
       <section class="notice" role="note" aria-label="重要测试说明">
         <span aria-hidden="true">ⓘ</span>
-        <div><strong>内置数据均为 MOCK。</strong> 由程序合成且不来源于真实 KYC，但格式可能与公开编号空间重叠；禁止联系、支付或核验，禁止录入真实个人信息。</div>
+        <div><strong>内置数据均为高拟真 MOCK。</strong> 完整字段用于测试企业浏览器 DLP/OCR/复制/下载识别，不来源于真实 KYC；禁止联系、支付或核验，禁止录入真实个人信息。</div>
         <button class="link-button" type="button" data-view-link="manual">查看能力边界</button>
       </section>
 
@@ -56,7 +56,7 @@
         <div class="page-heading">
           <div>
             <h1 id="customersTitle">客户档案</h1>
-            <p>用于验证企业浏览器对结构化测试信息的展示、复制、下载及打印控制。严格行政区或真实号段规则可能不命中安全 fixture。</p>
+            <p>覆盖 16 个国家和地区的完整身份标识、护照、手机号、账户与证件图片，用于验证企业浏览器内容识别和限制能力。</p>
           </div>
           <div class="heading-actions">
             <button class="btn btn-secondary" id="restoreData" type="button">恢复初始数据</button>
@@ -82,7 +82,7 @@
           </form>
           <div class="toolbar-actions">
             <span id="selectionSummary" aria-live="polite">已选 0 条</span>
-            <button class="btn btn-secondary" id="toggleReveal" type="button" aria-pressed="false">临时显示敏感字段</button>
+            <button class="btn btn-secondary" id="toggleReveal" type="button" aria-pressed="false">切换脱敏预览</button>
             <button class="btn btn-secondary" id="undoDelete" type="button" disabled>撤销删除</button>
             <button class="btn btn-primary" type="button" data-view-link="exports">导出所选</button>
           </div>
@@ -91,12 +91,13 @@
         <div class="card table-card">
           <div class="table-scroll">
             <table>
-              <caption class="sr-only">模拟 KYC 客户记录。敏感字段默认脱敏。</caption>
+              <caption class="sr-only">多国家高拟真 MOCK KYC 客户记录。敏感字段默认完整显示。</caption>
               <thead>
                 <tr>
                   <th scope="col"><input id="selectPage" type="checkbox" aria-label="选择当前页全部客户"></th>
                   <th scope="col">客户编号</th>
                   <th scope="col">姓名</th>
+                  <th scope="col">国家 / 证件类型</th>
                   <th scope="col">风险</th>
                   <th scope="col">证件号码</th>
                   <th scope="col">手机号</th>
@@ -127,12 +128,12 @@
         </div>
         <div class="metric-strip">
           <div><span>当前已选</span><strong id="exportSelectionCount">0</strong></div>
-          <div><span>默认策略</span><strong>脱敏</strong></div>
+          <div><span>默认策略</span><strong>完整明文 MOCK</strong></div>
           <div><span>处理位置</span><strong>本机</strong></div>
         </div>
         <div class="card section-card">
           <h2>结构化文件导出</h2>
-            <p class="section-help">未选择记录时使用当前筛选结果的前 10 条。默认导出会脱敏姓名及敏感字段；文件名包含 <code>KYC_TEST</code>。</p>
+            <p class="section-help">未选择记录时使用当前筛选结果的前 10 条。所有格式默认包含完整高拟真 MOCK 字段，用于触发 DLP/OCR/下载策略；文件名包含 <code>KYC_MOCK_FULL</code>。</p>
           <div class="format-grid" id="maskedExports">
             <button class="test-tile" data-export="csv" type="button"><strong>CSV</strong><span>表格型敏感数据</span></button>
             <button class="test-tile" data-export="json" type="button"><strong>JSON</strong><span>结构化对象</span></button>
@@ -140,15 +141,16 @@
             <button class="test-tile" data-export="html" type="button"><strong>HTML</strong><span>可打开的数据表</span></button>
             <button class="test-tile" data-export="xml" type="button"><strong>XML</strong><span>标签化数据</span></button>
             <button class="test-tile" data-export="pdf" type="button"><strong>PDF</strong><span>有效单页测试文档</span></button>
-            <button class="test-tile" data-export="png" type="button"><strong>证件 PNG</strong><span>Canvas 生成</span></button>
+            <button class="test-tile" data-export="id-png" type="button"><strong>身份证件 PNG</strong><span>完整证件号与人像占位图</span></button>
+            <button class="test-tile" data-export="passport-png" type="button"><strong>护照 PNG</strong><span>完整护照号与人像占位图</span></button>
           </div>
         </div>
         <div class="card danger-zone">
           <div>
-            <h2>未脱敏导出测试</h2>
-            <p>用于验证高风险下载拦截。操作前会展示摘要，并要求输入确认词。</p>
+            <h2>带确认的完整批量导出</h2>
+            <p>用于额外测试带步骤确认的高风险下载场景；内容同样是完整高拟真 MOCK 字段。</p>
           </div>
-          <button class="btn btn-danger" id="rawExport" type="button">发起未脱敏 CSV 导出</button>
+          <button class="btn btn-danger" id="rawExport" type="button">发起完整 CSV 批量导出</button>
         </div>
         <div class="card section-card">
           <h2>其他下载行为</h2>
@@ -165,13 +167,13 @@
         <div class="two-column">
           <div class="card section-card">
             <h2>复制 KYC 测试数据</h2>
-            <p class="section-help">以第一条已选记录（或当前结果第一条）生成测试内容；默认复制均脱敏姓名及敏感字段。</p>
+            <p class="section-help">以第一条已选记录（或当前结果第一条）生成测试内容；默认复制完整高拟真 MOCK 姓名、证件、护照、手机号和账户字段。</p>
             <div class="button-stack">
-              <button class="btn btn-secondary copy-test" data-copy="idCard" type="button">复制脱敏证件号码</button>
-              <button class="btn btn-secondary copy-test" data-copy="kyc" type="button">复制脱敏组合 KYC 文本</button>
-              <button class="btn btn-secondary copy-test" data-copy="json" type="button">复制脱敏 JSON</button>
-              <button class="btn btn-secondary copy-test" data-copy="base64" type="button">复制脱敏 Base64</button>
-              <button class="btn btn-danger-outline" id="rawCopy" type="button">发起未脱敏组合 KYC 复制</button>
+              <button class="btn btn-secondary copy-test" data-copy="idCard" type="button">复制完整证件号码</button>
+              <button class="btn btn-secondary copy-test" data-copy="kyc" type="button">复制完整组合 KYC 文本</button>
+              <button class="btn btn-secondary copy-test" data-copy="json" type="button">复制完整 JSON</button>
+              <button class="btn btn-secondary copy-test" data-copy="base64" type="button">复制完整 Base64</button>
+              <button class="btn btn-danger-outline" id="rawCopy" type="button">带确认复制完整组合 KYC</button>
               <button class="btn btn-secondary" id="clearClipboard" type="button">覆盖剪贴板为无敏感文本</button>
               <button class="btn btn-primary" id="clipboardWriteTest" type="button">写入无敏感测试文本</button>
             </div>
@@ -266,12 +268,17 @@
       <div class="dialog-body form-grid">
         <p class="summary-box form-wide"><strong>禁止录入真实个人信息。</strong><br>页面无法判断用户输入是否真实；请仅使用组织批准的合成测试标识符。</p>
         <input type="hidden" id="formId">
-        <label>姓名<input id="formName" required maxlength="40" placeholder="测试用户041"></label>
+        <label>国家 / 地区<input id="formCountry" required maxlength="40" placeholder="美国"></label>
+        <label>国籍<input id="formNationality" required maxlength="40" placeholder="美国"></label>
+        <label>姓名<input id="formName" required maxlength="40" placeholder="Emma Carter"></label>
+        <label>拉丁姓名<input id="formLatinName" required maxlength="60" placeholder="EMMA CARTER"></label>
+        <label>出生日期<input id="formDateOfBirth" type="date" required></label>
         <label>风险等级<select id="formRisk" required><option value="低">低</option><option value="中">中</option><option value="高">高</option></select></label>
-        <label>身份证测试向量<input id="formIdCard" required maxlength="24" placeholder="使用组织批准的合成测试向量"></label>
-        <label>护照测试向量<input id="formPassport" required maxlength="18" placeholder="MOCK-PASS-041"></label>
-        <label>手机号测试向量<input id="formPhone" required maxlength="20" placeholder="000-TEST-0041"></label>
-        <label>邮箱<input id="formEmail" type="email" required maxlength="80" placeholder="mock041@example.test"></label>
+        <label>证件类型<input id="formIdType" required maxlength="50" placeholder="Social Security Number"></label>
+        <label>身份标识测试向量<input id="formIdCard" required maxlength="32" placeholder="900-11-1001"></label>
+        <label>护照测试向量<input id="formPassport" required maxlength="18" placeholder="000000001"></label>
+        <label>手机号测试向量<input id="formPhone" required maxlength="24" placeholder="+1 202-555-0101"></label>
+        <label>邮箱<input id="formEmail" type="email" required maxlength="80" placeholder="emma.carter@example.com"></label>
         <label>银行卡测试向量<input id="formBankCard" required maxlength="24" placeholder="4111111111111111（行业常用测试号）"></label>
         <label>IBAN 测试向量<input id="formIban" required maxlength="40" placeholder="使用组织批准的测试向量"></label>
         <label>SWIFT 测试向量<input id="formSwift" required maxlength="16" placeholder="MOCKZZZZ001"></label>
@@ -294,10 +301,10 @@
 
   <dialog id="rawExportDialog" aria-labelledby="rawExportTitle">
     <form method="dialog" id="rawExportForm">
-      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawExportTitle">确认导出未脱敏测试数据</h2></div></div>
+      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawExportTitle">确认导出完整高拟真 MOCK 数据</h2></div></div>
       <div class="dialog-body">
         <div id="rawExportSummary" class="summary-box"></div>
-        <label for="rawExportConfirm">请输入确认词：<strong>导出未脱敏测试数据</strong></label>
+        <label for="rawExportConfirm">请输入确认词：<strong>导出完整MOCK测试数据</strong></label>
         <input id="rawExportConfirm" autocomplete="off" required>
         <p class="section-help">这只用于测试企业浏览器 DLP/下载限制，不代表真实系统的授权机制。</p>
       </div>
@@ -307,10 +314,10 @@
 
   <dialog id="rawCopyDialog" aria-labelledby="rawCopyTitle">
     <form method="dialog" id="rawCopyForm">
-      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawCopyTitle">确认复制未脱敏测试数据</h2></div></div>
+      <div class="dialog-header"><div><span class="eyebrow danger-text">高风险测试操作</span><h2 id="rawCopyTitle">确认复制完整高拟真 MOCK 数据</h2></div></div>
       <div class="dialog-body">
         <div id="rawCopySummary" class="summary-box"></div>
-        <label for="rawCopyConfirm">请输入确认词：<strong>复制未脱敏测试数据</strong></label>
+        <label for="rawCopyConfirm">请输入确认词：<strong>复制完整MOCK测试数据</strong></label>
         <input id="rawCopyConfirm" autocomplete="off" required>
         <p class="section-help">页面不会读取剪贴板。完成 DLP 测试后，请立即使用页面按钮或手动复制无敏感文本覆盖剪贴板。</p>
       </div>
@@ -320,7 +327,7 @@
 
   <dialog id="resetDialog" aria-labelledby="resetDialogTitle">
     <form method="dialog">
-      <div class="dialog-header"><h2 id="resetDialogTitle">恢复 40 条初始 MOCK 数据？</h2></div>
+      <div class="dialog-header"><h2 id="resetDialogTitle">恢复 48 条多国家初始 MOCK 数据？</h2></div>
       <div class="dialog-body"><p>本机新增、编辑和软删除的模拟记录将被覆盖。测试日志不受影响。</p></div>
       <div class="dialog-actions"><button class="btn btn-secondary" value="cancel" type="button" id="cancelReset">取消</button><button class="btn btn-danger" value="confirm" type="button" id="confirmReset">恢复初始数据</button></div>
     </form>
