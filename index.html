@@ -262,6 +262,15 @@
   </aside>
   <div class="scrim" id="drawerScrim" hidden></div>
 
+  <dialog id="documentPreviewDialog" class="document-preview-dialog" aria-labelledby="documentPreviewTitle">
+    <div class="dialog-header"><div><span class="eyebrow">MOCK 证件图片 · OCR 测试</span><h2 id="documentPreviewTitle">证件图片预览</h2></div><button class="icon-button" id="closeDocumentPreview" type="button" aria-label="关闭证件图片预览">×</button></div>
+    <div class="dialog-body">
+      <canvas id="documentPreviewCanvas" width="1000" height="630" aria-label="放大的 MOCK 证件图片"></canvas>
+      <p id="documentPreviewMeta" class="section-help"></p>
+    </div>
+    <div class="dialog-actions"><button class="btn btn-secondary" id="cancelDocumentPreview" type="button">关闭</button><button class="btn btn-primary" id="downloadDocumentPreview" type="button">下载当前 PNG</button></div>
+  </dialog>
+
   <dialog id="customerDialog" aria-labelledby="customerDialogTitle">
     <form method="dialog" id="customerForm">
       <div class="dialog-header"><div><span class="eyebrow">仅保存至本机</span><h2 id="customerDialogTitle">新增 KYC 测试记录</h2></div><button class="icon-button" value="cancel" type="button" id="closeCustomer" aria-label="关闭">×</button></div>

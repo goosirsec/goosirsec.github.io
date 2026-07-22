@@ -32,5 +32,9 @@ for (const legacyPath of ['data.json', 'css', 'js', 'img']) {
 assert.match(html, /Content-Security-Policy/);
 assert.match(html, /name="referrer" content="no-referrer"/);
 assert.match(html, /id="detailDrawer"[^>]*\binert\b/);
+assert.match(html, /id="documentPreviewDialog"/);
+assert.match(html, /id="documentPreviewCanvas"/);
+assert.match(script, /data-document-open="id"/);
+assert.match(script, /data-document-open="passport"/);
 
 console.log(`DOM contract passed: ${staticIdSelectors.size} selectors, ${panelViews.size} views, local resources present`);
