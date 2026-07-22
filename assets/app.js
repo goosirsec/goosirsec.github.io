@@ -1,13 +1,13 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'aml-browser-lab:kyc:v4';
+  const STORAGE_KEY = 'aml-browser-lab:kyc:v5';
   const SESSION_LOG_KEY = 'aml-browser-lab:session-log:v1';
   const PAGE_SIZE = 10;
   const RAW_CONFIRM_TEXT = '导出完整MOCK测试数据';
   const RAW_COPY_CONFIRM_TEXT = '复制完整MOCK测试数据';
-  const MASKED_FIELDS = ['name', 'latinName', 'dateOfBirth', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address'];
-  const EXPORT_FIELDS = ['customerId', 'country', 'nationality', 'name', 'latinName', 'dateOfBirth', 'risk', 'idType', 'idCard', 'passport', 'phone', 'email', 'bankCard', 'iban', 'swift', 'address', 'company', 'occupation'];
+  const MASKED_FIELDS = ['name', 'latinName', 'dateOfBirth', 'idCard', 'passport', 'passportMrz1', 'passportMrz2', 'phone', 'email', 'bankCard', 'cardExpiry', 'cardCvc', 'bankAccount', 'iban', 'swift', 'address'];
+  const EXPORT_FIELDS = ['customerId', 'country', 'nationality', 'name', 'latinName', 'sex', 'dateOfBirth', 'risk', 'idType', 'idCard', 'passport', 'passportExpiry', 'passportMrz1', 'passportMrz2', 'phone', 'email', 'bankName', 'bankCountryCode', 'cardBrand', 'cardFunding', 'bankCard', 'cardExpiry', 'cardCvc', 'currency', 'bankCodeType', 'bankCode', 'bankAccount', 'iban', 'swift', 'address', 'company', 'occupation'];
 
   const state = {
     records: [],
@@ -52,49 +52,328 @@
     return checkCodes[sum % 11];
   }
 
+  function luhnValid(value) {
+    const digits = String(value).replace(/\D/g, '');
+    if (digits.length < 12 || digits.length > 19) return false;
+    let sum = 0;
+    let double = false;
+    for (let index = digits.length - 1; index >= 0; index -= 1) {
+      let digit = Number(digits[index]);
+      if (double) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      double = !double;
+    }
+    return sum % 10 === 0;
+  }
+
+  function ibanRemainder(value) {
+    const normalized = String(value).replace(/\s/g, '').toUpperCase();
+    const rearranged = `${normalized.slice(4)}${normalized.slice(0, 4)}`;
+    let remainder = 0;
+    for (const character of rearranged) {
+      const expanded = /[A-Z]/.test(character) ? String(character.charCodeAt(0) - 55) : character;
+      for (const digit of expanded) remainder = ((remainder * 10) + Number(digit)) % 97;
+    }
+    return remainder;
+  }
+
+  function makeIban(countryCode, bban) {
+    const provisional = `${countryCode}00${bban}`;
+    return `${countryCode}${pad(98 - ibanRemainder(provisional), 2)}${bban}`;
+  }
+
+  function ibanValid(value) {
+    const normalized = String(value).replace(/\s/g, '').toUpperCase();
+    const lengths = { AE: 23, BR: 29, DE: 22, FR: 27, GB: 22, TR: 26 };
+    return /^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(normalized)
+      && lengths[normalized.slice(0, 2)] === normalized.length
+      && ibanRemainder(normalized) === 1;
+  }
+
+  function bicValid(value) {
+    return /^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/.test(String(value));
+  }
+
+  function mrzCheckDigit(value) {
+    const weights = [7, 3, 1];
+    const characterValue = (character) => {
+      if (/\d/.test(character)) return Number(character);
+      if (/[A-Z]/.test(character)) return character.charCodeAt(0) - 55;
+      return 0;
+    };
+    const total = String(value).split('').reduce((sum, character, index) => sum + (characterValue(character) * weights[index % 3]), 0);
+    return String(total % 10);
+  }
+
+  function mrzDate(value) {
+    return String(value).replaceAll('-', '').slice(2);
+  }
+
+  function makePassportMrz(record) {
+    const nameField = `${record.surname.replaceAll(' ', '<')}<<${record.givenNames.replaceAll(' ', '<')}`.toUpperCase();
+    const line1 = `P<${record.passportCountryCode}${nameField}`.padEnd(44, '<').slice(0, 44);
+    const passportField = record.passport.padEnd(9, '<').slice(0, 9);
+    const birthField = mrzDate(record.dateOfBirth);
+    const expiryField = mrzDate(record.passportExpiry);
+    const optionalField = `MOCK${record.customerId.replace(/\D/g, '')}`.padEnd(14, '<').slice(0, 14);
+    const documentBlock = `${passportField}${mrzCheckDigit(passportField)}`;
+    const birthBlock = `${birthField}${mrzCheckDigit(birthField)}`;
+    const expiryBlock = `${expiryField}${mrzCheckDigit(expiryField)}`;
+    const optionalBlock = `${optionalField}${mrzCheckDigit(optionalField)}`;
+    const composite = mrzCheckDigit(`${documentBlock}${birthBlock}${expiryBlock}${optionalBlock}`);
+    return {
+      line1,
+      line2: `${documentBlock}${record.passportCountryCode}${birthBlock}${record.sex}${expiryBlock}${optionalBlock}${composite}`,
+    };
+  }
+
+  function passportMrzValid(line1, line2) {
+    if (String(line1).length !== 44 || String(line2).length !== 44) return false;
+    const value = String(line2);
+    const documentBlock = value.slice(0, 10);
+    const birthBlock = value.slice(13, 20);
+    const expiryBlock = value.slice(21, 28);
+    const optionalBlock = value.slice(28, 43);
+    return mrzCheckDigit(documentBlock.slice(0, 9)) === documentBlock[9]
+      && mrzCheckDigit(birthBlock.slice(0, 6)) === birthBlock[6]
+      && mrzCheckDigit(expiryBlock.slice(0, 6)) === expiryBlock[6]
+      && mrzCheckDigit(optionalBlock.slice(0, 14)) === optionalBlock[14]
+      && mrzCheckDigit(`${documentBlock}${birthBlock}${expiryBlock}${optionalBlock}`) === value[43];
+  }
+
+  function makeTckn(seed) {
+    const firstNine = String(100000000 + seed).slice(0, 9);
+    const digits = firstNine.split('').map(Number);
+    const odd = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
+    const even = digits[1] + digits[3] + digits[5] + digits[7];
+    const tenth = (((odd * 7) - even) % 10 + 10) % 10;
+    const eleventh = (digits.reduce((sum, digit) => sum + digit, 0) + tenth) % 10;
+    return `${firstNine}${tenth}${eleventh}`;
+  }
+
+  function makeFrenchNir(sequence, dateOfBirth, sex) {
+    const compactDate = dateOfBirth.replaceAll('-', '');
+    const body = `${sex === 'F' ? '2' : '1'}${compactDate.slice(2, 6)}99${pad(900 + sequence, 3)}${pad(100 + sequence, 3)}`;
+    const key = pad(97 - Number(BigInt(body) % 97n), 2);
+    return `${body.slice(0, 1)} ${body.slice(1, 3)} ${body.slice(3, 5)} ${body.slice(5, 7)} ${body.slice(7, 10)} ${body.slice(10)} ${key}`;
+  }
+
+  function makeNric(sequence) {
+    const digits = pad(sequence, 7);
+    const weights = [2, 7, 6, 5, 4, 3, 2];
+    const sum = digits.split('').reduce((total, digit, index) => total + (Number(digit) * weights[index]), 4);
+    return `T${digits}${'JZIHGFEDC'[sum % 11]}`;
+  }
+
+  function verhoeffCheckDigit(value) {
+    const d = [
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+      [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+      [4, 0, 1, 2, 3, 9, 5, 6, 7, 8], [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+      [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+      [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+    ];
+    const p = [
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+      [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+      [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+      [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+    ];
+    const inverse = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9];
+    let checksum = 0;
+    String(value).split('').reverse().forEach((digit, index) => {
+      checksum = d[checksum][p[(index + 1) % 8][Number(digit)]];
+    });
+    return inverse[checksum];
+  }
+
+  function makeAadhaar(sequence) {
+    const firstEleven = `9999999900${sequence}`;
+    const raw = `${firstEleven}${verhoeffCheckDigit(firstEleven)}`;
+    return `${raw.slice(0, 4)} ${raw.slice(4, 8)} ${raw.slice(8)}`;
+  }
+
+  function aadhaarValid(value) {
+    const raw = String(value).replace(/\D/g, '');
+    return raw.length === 12 && verhoeffCheckDigit(raw.slice(0, 11)) === Number(raw[11]);
+  }
+
+  function makeMyNumber(sequence) {
+    const firstEleven = `1234567890${sequence}`;
+    const total = firstEleven.split('').reverse().reduce((sum, digit, index) => {
+      const weight = index < 6 ? index + 2 : index - 5;
+      return sum + (Number(digit) * weight);
+    }, 0);
+    const candidate = 11 - (total % 11);
+    const raw = `${firstEleven}${candidate >= 10 ? 0 : candidate}`;
+    return `${raw.slice(0, 4)} ${raw.slice(4, 8)} ${raw.slice(8)}`;
+  }
+
+  function myNumberValid(value) {
+    const raw = String(value).replace(/\D/g, '');
+    if (raw.length !== 12) return false;
+    const total = raw.slice(0, 11).split('').reverse().reduce((sum, digit, index) => {
+      const weight = index < 6 ? index + 2 : index - 5;
+      return sum + (Number(digit) * weight);
+    }, 0);
+    const candidate = 11 - (total % 11);
+    return Number(raw[11]) === (candidate >= 10 ? 0 : candidate);
+  }
+
+  function makeClabe(sequence) {
+    const firstSeventeen = `002180${pad(10000000000 + sequence, 11)}`;
+    const weights = [3, 7, 1];
+    const sum = firstSeventeen.split('').reduce((total, digit, index) => total + ((Number(digit) * weights[index % 3]) % 10), 0);
+    return `${firstSeventeen}${(10 - (sum % 10)) % 10}`;
+  }
+
+  function clabeValid(value) {
+    const raw = String(value).replace(/\D/g, '');
+    if (raw.length !== 18) return false;
+    const weights = [3, 7, 1];
+    const sum = raw.slice(0, 17).split('').reduce((total, digit, index) => total + ((Number(digit) * weights[index % 3]) % 10), 0);
+    return Number(raw[17]) === (10 - (sum % 10)) % 10;
+  }
+
+  function makeCpf(sequence) {
+    const firstNine = `3905334${pad(10 + sequence, 2)}`;
+    const calculate = (digits, startWeight) => {
+      const total = digits.split('').reduce((sum, digit, index) => sum + (Number(digit) * (startWeight - index)), 0);
+      const result = 11 - (total % 11);
+      return result >= 10 ? 0 : result;
+    };
+    const first = calculate(firstNine, 10);
+    const second = calculate(`${firstNine}${first}`, 11);
+    const raw = `${firstNine}${first}${second}`;
+    return `${raw.slice(0, 3)}.${raw.slice(3, 6)}.${raw.slice(6, 9)}-${raw.slice(9)}`;
+  }
+
+  function luhnCheckDigit(firstDigits) {
+    for (let candidate = 0; candidate <= 9; candidate += 1) {
+      if (luhnValid(`${firstDigits}${candidate}`)) return candidate;
+    }
+    return 0;
+  }
+
+  function makeSin(sequence) {
+    const firstEight = `0464542${sequence}`;
+    const raw = `${firstEight}${luhnCheckDigit(firstEight)}`;
+    return `${raw.slice(0, 3)} ${raw.slice(3, 6)} ${raw.slice(6)}`;
+  }
+
+  function makeTfn(sequence) {
+    const firstEight = `1234567${sequence}`;
+    const weights = [1, 4, 3, 7, 5, 8, 6, 9, 10];
+    for (let candidate = 0; candidate <= 9; candidate += 1) {
+      const raw = `${firstEight}${candidate}`;
+      const total = raw.split('').reduce((sum, digit, index) => sum + (Number(digit) * weights[index]), 0);
+      if (total % 11 === 0) return `${raw.slice(0, 3)} ${raw.slice(3, 6)} ${raw.slice(6)}`;
+    }
+    return '123 456 782';
+  }
+
+  function makeKoreanRrn(sequence, dateOfBirth, sex) {
+    const compactDate = dateOfBirth.replaceAll('-', '');
+    const year = Number(compactDate.slice(0, 4));
+    const genderCode = year >= 2000 ? (sex === 'F' ? '4' : '3') : (sex === 'F' ? '2' : '1');
+    const firstTwelve = `${compactDate.slice(2)}${genderCode}${pad(sequence, 5)}`;
+    const weights = [2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5];
+    const total = firstTwelve.split('').reduce((sum, digit, index) => sum + (Number(digit) * weights[index]), 0);
+    return `${firstTwelve.slice(0, 6)}-${firstTwelve.slice(6)}${(11 - (total % 11)) % 10}`;
+  }
+
+  function makeFrenchBban(sequence) {
+    const bank = '20041';
+    const branch = '01005';
+    const account = pad(100000 + sequence, 11);
+    const key = pad(97 - Number(((89n * BigInt(bank)) + (15n * BigInt(branch)) + (3n * BigInt(account))) % 97n), 2);
+    return `${bank}${branch}${account}${key}`;
+  }
+
   function createInitialRecords() {
     const profiles = [
-      { country: '中国', nationality: '中国', name: '李明', latinName: 'LI MING', idType: '居民身份证', phone: (n) => `13800138${pad(n, 3)}`, id: (n) => { const body = `110101199001${pad(n, 2)}000`; return `${body}${chinaIdChecksum(body)}`; }, passport: (n) => `E0000${pad(n, 4)}`, address: (n) => `北京市朝阳区测试路 ${100 + n} 号`, swift: 'BKCHCNBJ' },
+      { country: '中国', nationality: '中国', name: '李明', latinName: 'LI MING', idType: '居民身份证', phone: (n) => `13800138${pad(n, 3)}`, id: (n, dob) => { const body = `110101${dob.replaceAll('-', '')}${pad(n, 3)}`; return `${body}${chinaIdChecksum(body)}`; }, passport: (n) => `E0000${pad(n, 4)}`, address: (n) => `北京市朝阳区建国路 ${88 + n} 号测试单元`, swift: 'BKCHCNBJ' },
       { country: '美国', nationality: '美国', name: 'Emma Carter', latinName: 'EMMA CARTER', idType: 'Social Security Number', phone: (n) => `+1 202-555-${pad(100 + n, 4)}`, id: (n) => `900-${pad(10 + n, 2)}-${pad(1000 + n, 4)}`, passport: (n) => `${pad(n, 9)}`, address: (n) => `${1200 + n} Example Avenue, Washington, DC 20001`, swift: 'BOFAUS3N' },
       { country: '英国', nationality: '英国', name: 'Oliver Smith', latinName: 'OLIVER SMITH', idType: 'National Insurance Number', phone: (n) => `+44 7700 900${pad(n, 3)}`, id: (n) => `QQ ${pad(10 + n, 2)} ${pad(20 + n, 2)} ${pad(30 + n, 2)} C`, passport: (n) => `${pad(100000000 + n, 9)}`, address: (n) => `${10 + n} Example Road, London, SW1A 1AA`, swift: 'BARCGB22' },
       { country: '德国', nationality: '德国', name: 'Lukas Weber', latinName: 'LUKAS WEBER', idType: 'Personalausweis', phone: (n) => `+49 30 0000 ${pad(n, 4)}`, id: (n) => `T2200012${n}`, passport: (n) => `C01X00${pad(n, 3)}`, address: (n) => `Musterstrasse ${10 + n}, 10115 Berlin`, swift: 'DEUTDEFF' },
-      { country: '法国', nationality: '法国', name: 'Camille Martin', latinName: 'CAMILLE MARTIN', idType: 'Numero de securite sociale', phone: (n) => `+33 1 99 00 00 ${pad(n, 2)}`, id: (n) => `1 90 01 99 ${pad(n, 3)} 000 00`, passport: (n) => `00FR${pad(n, 5)}`, address: (n) => `${10 + n} rue Exemple, 75001 Paris`, swift: 'BNPAFRPP' },
-      { country: '新加坡', nationality: '新加坡', name: 'Tan Wei Ming', latinName: 'TAN WEI MING', idType: 'NRIC', phone: (n) => `+65 0000 ${pad(n, 4)}`, id: (n) => `T00000${pad(n, 2)}I`, passport: (n) => `E000${pad(n, 5)}`, address: (n) => `${10 + n} Example Walk, Singapore 000000`, swift: 'DBSSSGSG' },
-      { country: '阿联酋', nationality: '阿联酋', name: 'Omar Al Mansoori', latinName: 'OMAR AL MANSOORI', idType: 'Emirates ID', phone: (n) => `+971 50 000 ${pad(n, 4)}`, id: (n) => `784-1990-${pad(1234500 + n, 7)}-1`, passport: (n) => `A000${pad(n, 5)}`, address: (n) => `Villa ${10 + n}, Example District, Dubai`, swift: 'EBILAEAD' },
-      { country: '土耳其', nationality: '土耳其', name: 'Ayse Yilmaz', latinName: 'AYSE YILMAZ', idType: 'T.C. Kimlik No', phone: (n) => `+90 555 000 ${pad(n, 4)}`, id: () => '10000000146', passport: (n) => `U00${pad(n, 6)}`, address: (n) => `Ornek Mahallesi No ${10 + n}, Istanbul`, swift: 'ISBKTRIS' },
-      { country: '印度', nationality: '印度', name: 'Arjun Mehta', latinName: 'ARJUN MEHTA', idType: 'Aadhaar', phone: (n) => `+91 00000 ${pad(n, 5)}`, id: (n) => `9999 9999 ${pad(n, 4)}`, passport: (n) => `Z000${pad(n, 4)}`, address: (n) => `${10 + n} Example Nagar, New Delhi 110000`, swift: 'SBININBB' },
-      { country: '日本', nationality: '日本', name: '佐藤 健', latinName: 'SATO KEN', idType: 'My Number', phone: (n) => `+81 90-0000-${pad(n, 4)}`, id: (n) => `0000 0000 ${pad(n, 4)}`, passport: (n) => `TR000${pad(n, 4)}`, address: (n) => `東京都千代田区テスト町 ${10 + n}`, swift: 'BOTKJPJT' },
-      { country: '韩国', nationality: '韩国', name: '김민수', latinName: 'KIM MIN SU', idType: 'Resident Registration Number', phone: (n) => `+82 10-0000-${pad(n, 4)}`, id: (n) => `900101-0000${pad(n, 3)}`, passport: (n) => `M000${pad(n, 5)}`, address: (n) => `서울특별시 테스트구 예제로 ${10 + n}`, swift: 'HVBKKRSE' },
-      { country: '巴西', nationality: '巴西', name: 'Ana Souza', latinName: 'ANA SOUZA', idType: 'CPF', phone: (n) => `+55 11 90000-${pad(n, 4)}`, id: () => '111.444.777-35', passport: (n) => `BR00${pad(n, 4)}`, address: (n) => `Rua Exemplo ${10 + n}, Sao Paulo - SP`, swift: 'BRASBRRJ' },
+      { country: '法国', nationality: '法国', name: 'Camille Martin', latinName: 'CAMILLE MARTIN', idType: 'Numéro de sécurité sociale', phone: (n) => `+33 1 99 00 00 ${pad(n, 2)}`, id: makeFrenchNir, passport: (n) => `00FR${pad(n, 5)}`, address: (n) => `${10 + n} rue Exemple, 75001 Paris`, swift: 'BNPAFRPP' },
+      { country: '新加坡', nationality: '新加坡', name: 'Tan Wei Ming', latinName: 'TAN WEI MING', idType: 'NRIC', phone: (n) => `+65 8555 ${pad(100 + n, 4)}`, id: makeNric, passport: (n) => `E000${pad(n, 5)}`, address: (n) => `${10 + n} Example Walk, Singapore 018956`, swift: 'DBSSSGSG' },
+      { country: '阿联酋', nationality: '阿联酋', name: 'Omar Al Mansoori', latinName: 'OMAR AL MANSOORI', idType: 'Emirates ID', phone: (n) => `+971 50 555 ${pad(100 + n, 4)}`, id: (n, dob) => `784-${dob.slice(0, 4)}-${pad(1234500 + n, 7)}-${n}`, passport: (n) => `A000${pad(n, 5)}`, address: (n) => `Villa ${10 + n}, Example District, Dubai`, swift: 'EBILAEAD' },
+      { country: '土耳其', nationality: '土耳其', name: 'Ayşe Yılmaz', latinName: 'AYSE YILMAZ', idType: 'T.C. Kimlik No', phone: (n) => `+90 555 000 ${pad(100 + n, 4)}`, id: makeTckn, passport: (n) => `U00${pad(n, 6)}`, address: (n) => `Örnek Mahallesi No ${10 + n}, İstanbul`, swift: 'ISBKTRIS' },
+      { country: '印度', nationality: '印度', name: 'Arjun Mehta', latinName: 'ARJUN MEHTA', idType: 'Aadhaar', phone: (n) => `+91 99999 ${pad(n, 5)}`, id: makeAadhaar, passport: (n) => `Z000${pad(n, 4)}`, address: (n) => `${10 + n} Example Nagar, New Delhi 110001`, swift: 'SBININBB' },
+      { country: '日本', nationality: '日本', name: '佐藤 健', latinName: 'SATO KEN', idType: 'My Number', phone: (n) => `+81 90-0000-${pad(100 + n, 4)}`, id: makeMyNumber, passport: (n) => `TR000${pad(n, 4)}`, address: (n) => `東京都千代田区丸の内 ${n}-1 テスト棟`, swift: 'BOTKJPJT' },
+      { country: '韩国', nationality: '韩国', name: '김민수', latinName: 'KIM MIN SU', idType: 'Resident Registration Number', phone: (n) => `+82 10-0000-${pad(100 + n, 4)}`, id: makeKoreanRrn, passport: (n) => `M000${pad(n, 5)}`, address: (n) => `서울특별시 중구 세종대로 ${100 + n} 테스트동`, swift: 'HVBKKRSE' },
+      { country: '巴西', nationality: '巴西', name: 'Ana Souza', latinName: 'ANA SOUZA', idType: 'CPF', phone: (n) => `+55 11 90000-${pad(100 + n, 4)}`, id: makeCpf, passport: (n) => `BR00${pad(n, 4)}`, address: (n) => `Rua Exemplo ${10 + n}, São Paulo - SP, 01000-000`, swift: 'BRASBRRJ' },
       { country: '墨西哥', nationality: '墨西哥', name: 'Maria Gonzalez', latinName: 'MARIA GONZALEZ', idType: 'CURP', phone: (n) => `+52 55 0000 ${pad(n, 4)}`, id: () => 'GODE561231HDFRRN09', passport: (n) => `G00${pad(n, 6)}`, address: (n) => `Avenida Ejemplo ${10 + n}, Ciudad de Mexico`, swift: 'BCMRMXMM' },
-      { country: '加拿大', nationality: '加拿大', name: 'Emily Tremblay', latinName: 'EMILY TREMBLAY', idType: 'Social Insurance Number', phone: (n) => `+1 613-555-${pad(100 + n, 4)}`, id: () => '046 454 286', passport: (n) => `AB00${pad(n, 4)}`, address: (n) => `${10 + n} Example Street, Ottawa, ON K1A 0B1`, swift: 'ROYCCAT2' },
-      { country: '澳大利亚', nationality: '澳大利亚', name: 'Jack Wilson', latinName: 'JACK WILSON', idType: 'Tax File Number', phone: (n) => `+61 491 570 ${pad(100 + n, 3)}`, id: () => '123 456 782', passport: (n) => `N00${pad(n, 6)}`, address: (n) => `${10 + n} Example Circuit, Canberra ACT 2600`, swift: 'CTBAAU2S' },
-      { country: '巴拿马', nationality: '巴拿马', name: 'Carlos Rodriguez', latinName: 'CARLOS RODRIGUEZ', idType: 'Cedula', phone: (n) => `+507 0000-${pad(n, 4)}`, id: (n) => `8-888-${pad(8800 + n, 4)}`, passport: (n) => `PA00${pad(n, 4)}`, address: (n) => `Calle Ejemplo ${10 + n}, Ciudad de Panama`, swift: 'NAPAPAPA' },
+      { country: '加拿大', nationality: '加拿大', name: 'Emily Tremblay', latinName: 'EMILY TREMBLAY', idType: 'Social Insurance Number', phone: (n) => `+1 613-555-${pad(100 + n, 4)}`, id: makeSin, passport: (n) => `AB00${pad(n, 4)}`, address: (n) => `${10 + n} Example Street, Ottawa, ON K1A 0B1`, swift: 'ROYCCAT2' },
+      { country: '澳大利亚', nationality: '澳大利亚', name: 'Jack Wilson', latinName: 'JACK WILSON', idType: 'Tax File Number', phone: (n) => `+61 491 570 ${pad(100 + n, 3)}`, id: makeTfn, passport: (n) => `N00${pad(n, 6)}`, address: (n) => `${10 + n} Example Circuit, Canberra ACT 2600`, swift: 'CTBAAU2S' },
+      { country: '巴拿马', nationality: '巴拿马', name: 'Carlos Rodríguez', latinName: 'CARLOS RODRIGUEZ', idType: 'Cédula', phone: (n) => `+507 6000-${pad(100 + n, 4)}`, id: (n) => `8-888-${pad(8800 + n, 4)}`, passport: (n) => `PA00${pad(n, 4)}`, address: (n) => `Calle Ejemplo ${10 + n}, Ciudad de Panamá`, swift: 'NAPAPAPA' },
     ];
     const occupations = ['Security Analyst', 'Compliance Officer', 'Product Manager', 'Financial Analyst', 'Procurement Specialist', 'Designer', 'Operations Manager', 'Data Analyst'];
     const risks = ['低', '低', '中', '低', '高', '中', '低', '中'];
-    const testCards = ['4111111111111111', '4242424242424242', '5555555555554444', '4000056655665556'];
-    const testIbans = ['GB82WEST12345698765432', 'DE89370400440532013000', 'FR1420041010050500013M02606', 'AE070331234567890123456'];
+    const bankProfiles = [
+      { countryCode: 'CN', passportCode: 'CHN', brand: 'UnionPay', funding: 'Debit', pan: '6200000000000005', currency: 'CNY', codeType: 'CNAPS', code: '102100099996', account: (n) => pad(6222020000000000 + n, 16), bic: 'MCKBCNB0XXX' },
+      { countryCode: 'US', passportCode: 'USA', brand: 'American Express', funding: 'Credit', pan: '378282246310005', currency: 'USD', codeType: 'ABA routing', code: '110000000', account: (n) => pad(9000000000 + n, 10), bic: 'MCKBUSN0XXX' },
+      { countryCode: 'GB', passportCode: 'GBR', brand: 'Mastercard', funding: 'Credit', pan: '5555555555554444', currency: 'GBP', codeType: 'Sort code', code: '20-00-00', account: (n) => pad(10000000 + n, 8), bban: (n) => `MCKB200000${pad(10000000 + n, 8)}`, bic: 'MCKBGBL0XXX' },
+      { countryCode: 'DE', passportCode: 'DEU', brand: 'Visa Debit', funding: 'Debit', pan: '4000056655665556', currency: 'EUR', codeType: 'BLZ', code: '10000000', account: (n) => pad(1000000000 + n, 10), bban: (n) => `10000000${pad(1000000000 + n, 10)}`, bic: 'MCKBDEF0XXX' },
+      { countryCode: 'FR', passportCode: 'FRA', brand: 'Cartes Bancaires / Visa', funding: 'Debit', pan: '4000002500001001', currency: 'EUR', codeType: 'Code banque / guichet', code: '20041 / 01005', account: (n) => pad(100000 + n, 11), bban: makeFrenchBban, bic: 'MCKBFRP0XXX' },
+      { countryCode: 'SG', passportCode: 'SGP', brand: 'Visa', funding: 'Credit', pan: '4242424242424242', currency: 'SGD', codeType: 'Bank / branch code', code: '7171-001', account: (n) => pad(1000000000 + n, 10), bic: 'MCKBSGS0XXX' },
+      { countryCode: 'AE', passportCode: 'ARE', brand: 'Mastercard Debit', funding: 'Debit', pan: '5200828282828210', currency: 'AED', codeType: 'UAE bank code', code: '033', account: (n) => pad(1234567890123000 + n, 16), bban: (n) => `033${pad(1234567890123000 + n, 16)}`, bic: 'MCKBAED0XXX' },
+      { countryCode: 'TR', passportCode: 'TUR', brand: 'Mastercard 2-series', funding: 'Credit', pan: '2223003122003222', currency: 'TRY', codeType: 'Bank code', code: '00061', account: (n) => pad(1000000000000000 + n, 16), bban: (n) => `000610${pad(1000000000000000 + n, 16)}`, bic: 'MCKBTRI0XXX' },
+      { countryCode: 'IN', passportCode: 'IND', brand: 'Visa Debit', funding: 'Debit', pan: '4000056655665556', currency: 'INR', codeType: 'IFSC', code: 'MCKB0000001', account: (n) => pad(100000000000 + n, 12), bic: 'MCKBINM0XXX' },
+      { countryCode: 'JP', passportCode: 'JPN', brand: 'JCB', funding: 'Credit', pan: '3566002020360505', currency: 'JPY', codeType: 'Zengin bank / branch', code: '0005-001', account: (n) => pad(1000000 + n, 7), bic: 'MCKBJPY0XXX' },
+      { countryCode: 'KR', passportCode: 'KOR', brand: 'BCcard', funding: 'Credit', pan: '6555900000604105', currency: 'KRW', codeType: 'Bank / branch code', code: '088-001', account: (n) => pad(100000000000 + n, 12), bic: 'MCKBKRS0XXX' },
+      { countryCode: 'BR', passportCode: 'BRA', brand: 'Visa', funding: 'Credit', pan: '4242424242424242', currency: 'BRL', codeType: 'COMPE / branch', code: '00360305 / 00001', account: (n) => pad(1000 + n, 10), bban: (n) => `0036030500001${pad(1000 + n, 10)}C1`, bic: 'MCKBBRS0XXX' },
+      { countryCode: 'MX', passportCode: 'MEX', brand: 'Mastercard', funding: 'Credit', pan: '5555555555554444', currency: 'MXN', codeType: 'CLABE bank / plaza', code: '002 / 180', account: makeClabe, bic: 'MCKBMXM0XXX' },
+      { countryCode: 'CA', passportCode: 'CAN', brand: 'Interac', funding: 'Debit', pan: '4506445006931933', currency: 'CAD', codeType: 'Institution / transit', code: '001 / 00001', account: (n) => pad(1000000 + n, 7), bic: 'MCKBCAT0XXX' },
+      { countryCode: 'AU', passportCode: 'AUS', brand: 'eftpos Australia / Visa', funding: 'Debit', pan: '4000050360000001', currency: 'AUD', codeType: 'BSB', code: '062-000', account: (n) => pad(10000000 + n, 8), bic: 'MCKBAUS0XXX' },
+      { countryCode: 'PA', passportCode: 'PAN', brand: 'Visa', funding: 'Credit', pan: '4242424242424242', currency: 'PAB', codeType: 'Bank / branch code', code: '001-0001', account: (n) => pad(1000000000 + n, 10), bic: 'MCKBPAP0XXX' },
+    ];
+    const surnames = ['LI', 'CARTER', 'SMITH', 'WEBER', 'MARTIN', 'TAN', 'AL MANSOORI', 'YILMAZ', 'MEHTA', 'SATO', 'KIM', 'SOUZA', 'GONZALEZ', 'TREMBLAY', 'WILSON', 'RODRIGUEZ'];
+    const givenNames = ['MING', 'EMMA', 'OLIVER', 'LUKAS', 'CAMILLE', 'WEI MING', 'OMAR', 'AYSE', 'ARJUN', 'KEN', 'MIN SU', 'ANA', 'MARIA', 'EMILY', 'JACK', 'CARLOS'];
+    const sexes = ['M', 'F', 'M', 'M', 'F', 'M', 'M', 'F', 'M', 'M', 'M', 'F', 'F', 'F', 'M', 'M'];
     return Array.from({ length: 48 }, (_, index) => {
       const number = index + 1;
       const profile = profiles[index % profiles.length];
+      const bank = bankProfiles[index % bankProfiles.length];
       const sequence = Math.floor(index / profiles.length) + 1;
-      return {
-        customerId: `MOCK-KYC-${pad(number, 3)}`,
+      const customerId = `MOCK-KYC-${pad(number, 3)}`;
+      const dateOfBirth = profile.country === '墨西哥' ? '1956-12-31' : '1990-01-01';
+      const sex = sexes[index % sexes.length];
+      const record = {
+        customerId,
         country: profile.country,
         nationality: profile.nationality,
         name: profile.name,
         latinName: profile.latinName,
-        dateOfBirth: `1990-${pad((index % 12) + 1)}-${pad((index % 27) + 1)}`,
+        surname: surnames[index % surnames.length],
+        givenNames: givenNames[index % givenNames.length],
+        sex,
+        dateOfBirth,
         risk: risks[index % risks.length],
         idType: profile.idType,
-        idCard: profile.id(sequence),
+        idCard: profile.id(sequence, dateOfBirth, sex),
         passport: profile.passport(sequence),
+        passportCountryCode: bank.passportCode,
+        passportExpiry: `203${sequence}-12-31`,
         phone: profile.phone(sequence),
         email: `${profile.latinName.toLowerCase().replaceAll(' ', '.')}.${sequence}@example.com`,
-        bankCard: testCards[index % testCards.length],
-        iban: testIbans[index % testIbans.length],
-        swift: profile.swift,
+        bankName: `Mock International Bank — ${profile.country} Test Branch`,
+        bankCountryCode: bank.countryCode,
+        cardBrand: bank.brand,
+        cardFunding: bank.funding,
+        bankCard: bank.pan,
+        cardExpiry: `12/${32 + sequence}`,
+        cardCvc: bank.brand === 'American Express' ? '1234' : '123',
+        currency: bank.currency,
+        bankCodeType: bank.codeType,
+        bankCode: bank.code,
+        bankAccount: bank.account(sequence),
+        iban: bank.bban ? makeIban(bank.countryCode, bank.bban(sequence)) : 'N/A (NON-IBAN COUNTRY)',
+        swift: bank.bic,
         address: profile.address(sequence),
         company: `${profile.country} Example Holdings ${sequence}`,
         occupation: occupations[index % occupations.length],
@@ -103,15 +382,19 @@
         deletedAt: null,
         mock: true,
         source: 'builtin-mock',
-        schemaVersion: 4,
+        schemaVersion: 5,
       };
+      const mrz = makePassportMrz(record);
+      record.passportMrz1 = mrz.line1;
+      record.passportMrz2 = mrz.line2;
+      return record;
     });
   }
 
   function validStoredRecords(value) {
     return Array.isArray(value) && value.every((item) => item
       && typeof item.customerId === 'string'
-      && item.schemaVersion === 4
+      && item.schemaVersion === 5
       && ['builtin-mock', 'user-confirmed-test'].includes(item.source));
   }
 
@@ -221,6 +504,8 @@
     if (field === 'idCard') return `${text.slice(0, 6)}********${text.slice(-4)}`;
     if (field === 'passport') return `${text.slice(0, 2)}****${text.slice(-3)}`;
     if (field === 'bankCard') return `${text.slice(0, 4)} **** **** ${text.slice(-4)}`;
+    if (field === 'bankAccount') return `${text.slice(0, 3)}******${text.slice(-3)}`;
+    if (field === 'cardCvc') return '*'.repeat(text.length);
     if (field === 'iban') return `${text.slice(0, 4)} **** **** ${text.slice(-4)}`;
     if (field === 'swift') return `${text.slice(0, 4)}***${text.slice(-2)}`;
     return text.length > 6 ? `${text.slice(0, 2)}***${text.slice(-2)}` : '***';
@@ -252,7 +537,13 @@
         record.passport,
         record.phone,
         record.email,
+        record.bankName,
+        record.cardBrand,
         record.bankCard,
+        record.bankCodeType,
+        record.bankCode,
+        record.bankAccount,
+        record.currency,
         record.iban,
         record.swift,
         record.address,
@@ -290,7 +581,7 @@
         <td><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></td>
         <td class="mono">${escapeHtml(reveal ? record.idCard : maskValue('idCard', record.idCard))}</td>
         <td class="mono">${escapeHtml(reveal ? record.phone : maskValue('phone', record.phone))}</td>
-        <td class="mono">${escapeHtml(reveal ? record.bankCard : maskValue('bankCard', record.bankCard))}</td>
+        <td class="mono">${escapeHtml(reveal ? record.bankCard : maskValue('bankCard', record.bankCard))}<br><span class="section-help">${escapeHtml(record.cardBrand || '自定义卡组织')} · ${luhnValid(record.bankCard) ? 'Luhn ✓' : 'Luhn 未通过'}</span></td>
         <td><strong>${escapeHtml(record.company)}</strong><br><span class="section-help">${escapeHtml(record.occupation)}</span></td>
         <td class="row-actions">
           <button class="text-action view-record" data-id="${escapeHtml(record.customerId)}" type="button">查看</button>
@@ -403,12 +694,13 @@
     state.drawerRecordId = id;
     const reveal = isRevealed();
     const sensitive = (field) => escapeHtml(reveal ? record[field] : maskValue(field, record[field]));
+    const ibanStatus = record.iban === 'N/A (NON-IBAN COUNTRY)' ? '该国家不采用 IBAN' : (ibanValid(record.iban) ? 'MOD-97 ✓' : 'MOD-97 未通过');
     $('#drawerContent').innerHTML = `
       <div class="summary-box"><strong>${record.source === 'builtin-mock' ? '高拟真合成 MOCK 数据' : '用户确认的本机测试数据'} / 无后端</strong><br>${record.source === 'builtin-mock' ? '完整字段用于企业浏览器 DLP、OCR、复制和下载识别；不来源于真实 KYC，禁止联系、支付或核验。' : '此档案来自用户输入，页面不验证其真实性；录入者已确认只使用获批测试信息。'}</div>
       <div class="button-row"><button class="btn btn-secondary" id="drawerReveal" type="button">${reveal ? '切换为脱敏预览' : '恢复完整明文数据'}</button><button class="btn btn-secondary copy-record" data-id="${escapeHtml(id)}" type="button">复制完整组合 KYC</button></div>
       <section class="detail-section"><h3>基本信息</h3><dl class="detail-grid"><dt>客户编号</dt><dd>${escapeHtml(record.customerId)}</dd><dt>国家 / 地区</dt><dd>${escapeHtml(record.country || '自定义')}</dd><dt>姓名</dt><dd>${escapeHtml(record.name)}</dd><dt>拉丁姓名</dt><dd>${escapeHtml(record.latinName || '')}</dd><dt>出生日期</dt><dd>${sensitive('dateOfBirth')}</dd><dt>风险等级</dt><dd><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></dd><dt>公司</dt><dd>${escapeHtml(record.company)}</dd><dt>职业</dt><dd>${escapeHtml(record.occupation)}</dd></dl></section>
-      <section class="detail-section"><h3>身份与联系方式</h3><dl class="detail-grid"><dt>证件类型</dt><dd>${escapeHtml(record.idType || '身份标识')}</dd><dt>证件号码</dt><dd class="mono">${sensitive('idCard')}</dd><dt>护照号码</dt><dd class="mono">${sensitive('passport')}</dd><dt>手机号</dt><dd class="mono">${sensitive('phone')}</dd><dt>邮箱</dt><dd>${sensitive('email')}</dd><dt>地址</dt><dd>${sensitive('address')}</dd></dl></section>
-      <section class="detail-section"><h3>金融标识</h3><dl class="detail-grid"><dt>银行卡</dt><dd class="mono">${sensitive('bankCard')}</dd><dt>IBAN</dt><dd class="mono">${sensitive('iban')}</dd><dt>SWIFT</dt><dd class="mono">${sensitive('swift')}</dd></dl></section>
+      <section class="detail-section"><h3>身份与联系方式</h3><dl class="detail-grid"><dt>证件类型</dt><dd>${escapeHtml(record.idType || '身份标识')}</dd><dt>证件号码</dt><dd class="mono">${sensitive('idCard')}</dd><dt>护照号码</dt><dd class="mono">${sensitive('passport')}</dd><dt>护照有效期</dt><dd class="mono">${escapeHtml(record.passportExpiry || '')}</dd><dt>MRZ 校验</dt><dd>${record.passportMrz1 && passportMrzValid(record.passportMrz1, record.passportMrz2) ? 'ICAO 9303 校验位 ✓' : '自定义记录未校验'}</dd><dt>手机号</dt><dd class="mono">${sensitive('phone')}</dd><dt>邮箱</dt><dd>${sensitive('email')}</dd><dt>地址</dt><dd>${sensitive('address')}</dd></dl></section>
+      <section class="detail-section"><h3>银行卡与账户</h3><dl class="detail-grid"><dt>持卡人</dt><dd>${sensitive('latinName')}</dd><dt>卡组织 / 类型</dt><dd>${escapeHtml(record.cardBrand || '自定义')} · ${escapeHtml(record.cardFunding || '未指定')}</dd><dt>银行卡 PAN</dt><dd class="mono">${sensitive('bankCard')} · ${luhnValid(record.bankCard) ? 'Luhn ✓' : 'Luhn 未通过'}</dd><dt>有效期 / CVC</dt><dd class="mono">${sensitive('cardExpiry')} / ${sensitive('cardCvc')} <span class="section-help">仅公开沙箱测试值；生产系统禁止留存 CVC</span></dd><dt>银行</dt><dd>${escapeHtml(record.bankName || '自定义测试银行')}</dd><dt>币种</dt><dd class="mono">${escapeHtml(record.currency || '')}</dd><dt>${escapeHtml(record.bankCodeType || '本地银行代码')}</dt><dd class="mono">${escapeHtml(record.bankCode || '')}</dd><dt>本地账户号</dt><dd class="mono">${sensitive('bankAccount')}</dd><dt>IBAN</dt><dd class="mono">${sensitive('iban')} · ${ibanStatus}</dd><dt>SWIFT / BIC</dt><dd class="mono">${sensitive('swift')} · ${bicValid(record.swift) ? 'ISO 9362 格式 ✓' : '格式未通过'}</dd></dl></section>
       <section class="detail-section"><h3>MOCK 证件图片（OCR 测试）</h3><div class="document-preview-grid"><figure><canvas id="drawerIdCanvas" data-document-canvas="id" width="1000" height="630" aria-label="完整 MOCK 身份证件图片"></canvas><figcaption>${escapeHtml(record.country)} ${escapeHtml(record.idType)} · 完整测试字段</figcaption></figure><figure><canvas id="drawerPassportCanvas" data-document-canvas="passport" width="1000" height="630" aria-label="完整 MOCK 护照图片"></canvas><figcaption>${escapeHtml(record.country)} Passport · 完整测试字段</figcaption></figure></div></section>
     `;
     drawDocumentCanvas($('[data-document-canvas="id"]', $('#drawerContent')), record, 'id', !reveal);
@@ -480,14 +772,31 @@
       nationality: $('#formNationality').value.trim(),
       name: $('#formName').value.trim(),
       latinName: $('#formLatinName').value.trim(),
+      surname: existing?.surname || $('#formLatinName').value.trim().split(/\s+/).at(-1) || 'MOCK',
+      givenNames: existing?.givenNames || $('#formLatinName').value.trim().split(/\s+/).slice(0, -1).join(' ') || 'TEST',
+      sex: existing?.sex || 'X',
       dateOfBirth: $('#formDateOfBirth').value,
       risk: $('#formRisk').value,
       idType: $('#formIdType').value.trim(),
       idCard: $('#formIdCard').value.trim(),
       passport: $('#formPassport').value.trim(),
+      passportCountryCode: existing?.passportCountryCode || 'UTO',
+      passportExpiry: existing?.passportExpiry || '',
+      passportMrz1: '',
+      passportMrz2: '',
       phone: $('#formPhone').value.trim(),
       email: $('#formEmail').value.trim(),
+      bankName: existing?.bankName || 'User-confirmed mock bank',
+      bankCountryCode: existing?.bankCountryCode || 'ZZ',
+      cardBrand: existing?.cardBrand || 'User-specified test PAN',
+      cardFunding: existing?.cardFunding || 'Unspecified',
       bankCard: $('#formBankCard').value.trim(),
+      cardExpiry: existing?.cardExpiry || '',
+      cardCvc: existing?.cardCvc || '',
+      currency: existing?.currency || 'XXX',
+      bankCodeType: existing?.bankCodeType || 'Local code',
+      bankCode: existing?.bankCode || '',
+      bankAccount: existing?.bankAccount || '',
       iban: $('#formIban').value.trim(),
       swift: $('#formSwift').value.trim(),
       company: $('#formCompany').value.trim(),
@@ -498,7 +807,7 @@
       deletedAt: existing?.deletedAt || null,
       mock: false,
       source: 'user-confirmed-test',
-      schemaVersion: 4,
+      schemaVersion: 5,
     };
   }
 
@@ -631,10 +940,13 @@
       `Generated: ${new Date().toISOString()}`,
       `Records: ${records.length} (full test fields)`,
       '',
-      ...records.slice(0, 18).map((record) => {
+      ...records.slice(0, 10).flatMap((record) => {
         const item = presentRecord(record, false);
         const risk = record.risk === '高' ? 'HIGH' : record.risk === '中' ? 'MEDIUM' : 'LOW';
-        return `${item.country} | ${item.latinName} | ${risk} | ${item.idType}: ${item.idCard} | P: ${item.passport}`;
+        return [
+          `${item.country} | ${item.latinName} | ${risk} | ${item.idType}: ${item.idCard} | P: ${item.passport}`,
+          `${item.cardBrand} PAN:${item.bankCard} EXP:${item.cardExpiry} CVC:${item.cardCvc} IBAN:${item.iban} BIC:${item.swift}`,
+        ];
       }),
     ];
     const textOps = lines.map((line, index) => `BT /F1 ${index === 0 ? 15 : 9} Tf 48 ${790 - (index * 27)} Td (${pdfEscape(pdfAscii(line))}) Tj ET`).join('\n');
@@ -688,8 +1000,13 @@
     ctx.fillText(`NATIONALITY: ${record.nationality}`, 330, 395);
     ctx.fillText(`PHONE: ${value('phone')}`, 330, 440);
     ctx.fillText(`CUSTOMER: ${record.customerId}`, 330, 485);
+    if (isPassport) {
+      ctx.font = '18px monospace';
+      ctx.fillText(value('passportMrz1'), 72, 555);
+      ctx.fillText(value('passportMrz2'), 72, 590);
+    }
     ctx.save();
-    ctx.translate(680, 535);
+    ctx.translate(680, 510);
     ctx.rotate(-0.18);
     ctx.globalAlpha = 0.25;
     ctx.fillStyle = '#b42318';
@@ -754,7 +1071,7 @@
       return;
     }
     const userSuppliedCount = records.filter((record) => record.source !== 'builtin-mock').length;
-    $('#rawExportSummary').innerHTML = `<strong>导出摘要</strong><br>格式：CSV<br>记录数：${records.length}<br>字段数：${EXPORT_FIELDS.length}<br>敏感字段：姓名、身份证、护照、手机号、邮箱、银行卡、IBAN、SWIFT、地址<br>内置 MOCK：${records.length - userSuppliedCount} 条<br>用户确认的测试数据：${userSuppliedCount} 条<br>页面不会验证用户输入内容的真实性。`;
+    $('#rawExportSummary').innerHTML = `<strong>导出摘要</strong><br>格式：CSV<br>记录数：${records.length}<br>字段数：${EXPORT_FIELDS.length}<br>敏感字段：姓名、身份证、护照/MRZ、手机号、邮箱、PAN、有效期、测试 CVC、本地账户、IBAN、BIC、地址<br>内置 MOCK：${records.length - userSuppliedCount} 条<br>用户确认的测试数据：${userSuppliedCount} 条<br>页面不会验证用户输入内容的真实性。`;
     $('#rawExportConfirm').value = '';
     $('#confirmRawExport').disabled = true;
     showDialog($('#rawExportDialog'), '#cancelRawExport');
@@ -1117,13 +1434,20 @@
 
   if (globalThis.__BROWSER_LAB_TEST__ === true) {
     globalThis.__BROWSER_LAB_TEST_API__ = Object.freeze({
+      aadhaarValid,
       chinaIdChecksum,
+      bicValid,
+      clabeValid,
       createPdf,
       createInitialRecords,
       csvCell,
       exportPng,
       drawDocumentCanvas,
+      ibanValid,
+      luhnValid,
       maskValue,
+      myNumberValid,
+      passportMrzValid,
       pdfAscii,
       presentRecord,
     });

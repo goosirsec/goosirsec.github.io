@@ -20,11 +20,18 @@ const context = {
 vm.runInNewContext(source, context, { filename: 'assets/app.js' });
 
 const {
+  aadhaarValid,
+  bicValid,
   chinaIdChecksum,
+  clabeValid,
   createPdf,
   createInitialRecords,
   csvCell,
   exportPng,
+  ibanValid,
+  luhnValid,
+  myNumberValid,
+  passportMrzValid,
   presentRecord,
 } = context.__BROWSER_LAB_TEST_API__;
 
@@ -37,6 +44,7 @@ assert.equal(csvCell('ordinary'), '"ordinary"');
 const records = createInitialRecords();
 assert.equal(records.length, 48);
 assert.equal(new Set(records.map((record) => record.country)).size, 16);
+const ibanCountries = new Set(['AE', 'BR', 'DE', 'FR', 'GB', 'TR']);
 for (const record of records) {
   assert.ok(record.name.length > 1);
   assert.ok(record.latinName.length > 2);
@@ -46,16 +54,37 @@ for (const record of records) {
   assert.ok(record.passport.length >= 7);
   assert.doesNotMatch(record.idCard, /\*/);
   assert.doesNotMatch(record.phone, /TEST|\*/);
+  assert.equal(luhnValid(record.bankCard), true, `${record.country} test PAN must pass Luhn`);
+  assert.match(record.cardExpiry, /^12\/3[3-5]$/);
+  assert.equal(record.cardCvc.length, record.cardBrand === 'American Express' ? 4 : 3);
+  assert.match(record.currency, /^[A-Z]{3}$/);
+  assert.ok(record.bankName.includes('Mock International Bank'));
+  assert.match(record.bankAccount, /^[A-Z0-9]+$/);
+  assert.equal(bicValid(record.swift), true, `${record.country} BIC must match ISO 9362 structure`);
+  assert.equal(record.swift.slice(4, 6), record.bankCountryCode);
+  if (ibanCountries.has(record.bankCountryCode)) {
+    assert.equal(ibanValid(record.iban), true, `${record.country} IBAN must pass MOD-97 and country length`);
+    assert.equal(record.iban.slice(0, 2), record.bankCountryCode);
+  } else {
+    assert.equal(record.iban, 'N/A (NON-IBAN COUNTRY)');
+  }
+  assert.equal(passportMrzValid(record.passportMrz1, record.passportMrz2), true, `${record.country} MRZ must validate`);
+  assert.equal(record.passportMrz2.slice(10, 13), record.passportCountryCode);
   assert.equal(record.source, 'builtin-mock');
-  assert.equal(record.schemaVersion, 4);
+  assert.equal(record.schemaVersion, 5);
 }
+
+records.filter((record) => record.country === '印度').forEach((record) => assert.equal(aadhaarValid(record.idCard), true));
+records.filter((record) => record.country === '日本').forEach((record) => assert.equal(myNumberValid(record.idCard), true));
+records.filter((record) => record.country === '墨西哥').forEach((record) => assert.equal(clabeValid(record.bankAccount), true));
 
 const chinaRecords = records.filter((record) => record.country === '中国');
 assert.equal(chinaRecords.length, 3);
 for (const record of chinaRecords) {
-  assert.match(record.idCard, /^110101\d{11}[0-9X]$/);
+  assert.match(record.idCard, /^11010119900101\d{3}[0-9X]$/);
   assert.equal(record.idCard.at(-1), chinaIdChecksum(record.idCard.slice(0, 17)));
   assert.match(record.phone, /^13800138\d{3}$/);
+  assert.equal(record.idCard.slice(6, 14), record.dateOfBirth.replaceAll('-', ''));
 }
 
 const masked = presentRecord(records[0], true);
@@ -92,4 +121,4 @@ context.document.createElement = () => ({
 });
 assert.equal(await exportPng(records[0]), false);
 
-console.log('security tests passed: CSV, 16-country full fixtures, optional masking, PDF xref, Canvas failure paths');
+console.log('security tests passed: Luhn PANs, country-aware IBAN/BIC, passport MRZ, identity consistency, CSV, PDF, Canvas');
