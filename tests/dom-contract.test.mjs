@@ -34,7 +34,12 @@ assert.match(html, /name="referrer" content="no-referrer"/);
 assert.match(html, /id="detailDrawer"[^>]*\binert\b/);
 assert.match(html, /id="documentPreviewDialog"/);
 assert.match(html, /id="documentPreviewCanvas"/);
+assert.match(html, /id="documentPreviewImage"/);
+assert.match(script, /DIRECT_IMAGE_SRC = '\.\/assets\/mock-id-direct\.svg'/);
+assert.equal(fs.existsSync(path.join(root, 'assets/mock-id-direct.svg')), true, 'Missing directly referenced mock document image');
 assert.match(script, /data-document-open="id"/);
 assert.match(script, /data-document-open="passport"/);
+assert.match(script, /data-document-open="comparison-canvas"/);
+assert.match(script, /data-document-open="direct-image"/);
 
 console.log(`DOM contract passed: ${staticIdSelectors.size} selectors, ${panelViews.size} views, local resources present`);

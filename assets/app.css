@@ -157,11 +157,11 @@ td input[type="checkbox"], th input[type="checkbox"] { width: 16px; min-height: 
 .detail-grid dd { margin: 0; overflow-wrap: anywhere; }
 .document-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .document-preview-grid figure { margin: 0; }
-.document-preview-grid canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #f6f9fd; }
+.document-preview-grid canvas, .document-preview-grid img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #f6f9fd; }
 .document-preview-grid figcaption { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .document-preview-button { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: zoom-in; text-align: left; }
-.document-preview-button canvas { pointer-events: none; transition: transform .16s ease, box-shadow .16s ease; }
-.document-preview-button:hover canvas { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(24, 48, 80, .18); }
+.document-preview-button canvas, .document-preview-button img { pointer-events: none; transition: transform .16s ease, box-shadow .16s ease; }
+.document-preview-button:hover canvas, .document-preview-button:hover img { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(24, 48, 80, .18); }
 .document-preview-button:focus-visible { outline: 3px solid rgba(21, 94, 239, .35); outline-offset: 3px; }
 .document-preview-zoom { position: absolute; right: 8px; bottom: 8px; padding: 4px 7px; border-radius: 4px; color: white; background: rgba(11, 23, 40, .78); font-size: 11px; font-weight: 700; pointer-events: none; }
 .scrim { position: fixed; z-index: 70; inset: 0; background: rgba(0, 10, 25, .5); }
@@ -172,7 +172,8 @@ dialog { width: min(760px, calc(100vw - 28px)); padding: 0; border: 0; border-ra
 dialog::backdrop { background: rgba(0, 10, 25, .55); }
 .document-preview-dialog { width: min(1080px, calc(100vw - 28px)); max-width: none; }
 .document-preview-dialog .dialog-body { background: #eef2f7; }
-#documentPreviewCanvas { display: block; width: 100%; height: auto; border-radius: 10px; background: white; box-shadow: 0 10px 30px rgba(24, 48, 80, .16); }
+#documentPreviewCanvas, #documentPreviewImage { display: block; width: 100%; height: auto; border-radius: 10px; background: white; box-shadow: 0 10px 30px rgba(24, 48, 80, .16); }
+#documentPreviewCanvas[hidden], #documentPreviewImage[hidden] { display: none; }
 #documentPreviewMeta { margin: 10px 0 0; overflow-wrap: anywhere; }
 .dialog-header { display: flex; justify-content: space-between; align-items: start; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .dialog-header h2 { margin: 2px 0 0; }

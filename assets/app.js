@@ -8,6 +8,18 @@
   const RAW_COPY_CONFIRM_TEXT = '复制完整MOCK测试数据';
   const MASKED_FIELDS = ['name', 'latinName', 'dateOfBirth', 'idCard', 'passport', 'passportMrz1', 'passportMrz2', 'phone', 'email', 'bankCard', 'cardExpiry', 'cardCvc', 'bankAccount', 'iban', 'swift', 'address'];
   const EXPORT_FIELDS = ['customerId', 'country', 'nationality', 'name', 'latinName', 'sex', 'dateOfBirth', 'risk', 'idType', 'idCard', 'passport', 'passportExpiry', 'passportMrz1', 'passportMrz2', 'phone', 'email', 'bankName', 'bankCountryCode', 'cardBrand', 'cardFunding', 'bankCard', 'cardExpiry', 'cardCvc', 'currency', 'bankCodeType', 'bankCode', 'bankAccount', 'iban', 'swift', 'address', 'company', 'occupation'];
+  const DIRECT_IMAGE_SRC = './assets/mock-id-direct.svg';
+  const COMPARISON_RECORD = Object.freeze({
+    country: 'TESTLAND',
+    idType: 'Synthetic Identity Card',
+    name: 'ALEX MOCK',
+    latinName: 'ALEX MOCK',
+    dateOfBirth: '1990-01-01',
+    idCard: 'TST-9000-0001',
+    nationality: 'TESTLAND',
+    phone: '+1 202-555-0199',
+    customerId: 'KYC-MOCK-COMPARE-001',
+  });
 
   const state = {
     records: [],
@@ -703,10 +715,12 @@
       <section class="detail-section"><h3>基本信息</h3><dl class="detail-grid"><dt>客户编号</dt><dd>${escapeHtml(record.customerId)}</dd><dt>国家 / 地区</dt><dd>${escapeHtml(record.country || '自定义')}</dd><dt>姓名</dt><dd>${escapeHtml(record.name)}</dd><dt>拉丁姓名</dt><dd>${escapeHtml(record.latinName || '')}</dd><dt>出生日期</dt><dd>${sensitive('dateOfBirth')}</dd><dt>风险等级</dt><dd><span class="risk ${riskClass(record.risk)}">${escapeHtml(record.risk)}风险</span></dd><dt>公司</dt><dd>${escapeHtml(record.company)}</dd><dt>职业</dt><dd>${escapeHtml(record.occupation)}</dd></dl></section>
       <section class="detail-section"><h3>身份与联系方式</h3><dl class="detail-grid"><dt>证件类型</dt><dd>${escapeHtml(record.idType || '身份标识')}</dd><dt>证件号码</dt><dd class="mono">${sensitive('idCard')}</dd><dt>护照号码</dt><dd class="mono">${sensitive('passport')}</dd><dt>护照有效期</dt><dd class="mono">${escapeHtml(record.passportExpiry || '')}</dd><dt>MRZ 校验</dt><dd>${record.passportMrz1 && passportMrzValid(record.passportMrz1, record.passportMrz2) ? 'ICAO 9303 校验位 ✓' : '自定义记录未校验'}</dd><dt>手机号</dt><dd class="mono">${sensitive('phone')}</dd><dt>邮箱</dt><dd>${sensitive('email')}</dd><dt>地址</dt><dd>${sensitive('address')}</dd></dl></section>
       <section class="detail-section"><h3>银行卡与账户</h3><dl class="detail-grid"><dt>持卡人</dt><dd>${sensitive('latinName')}</dd><dt>卡组织 / 类型</dt><dd>${escapeHtml(record.cardBrand || '自定义')} · ${escapeHtml(record.cardFunding || '未指定')}</dd><dt>银行卡 PAN</dt><dd class="mono">${sensitive('bankCard')} · ${luhnValid(record.bankCard) ? 'Luhn ✓' : 'Luhn 未通过'}</dd><dt>有效期 / CVC</dt><dd class="mono">${sensitive('cardExpiry')} / ${sensitive('cardCvc')} <span class="section-help">仅公开沙箱测试值；生产系统禁止留存 CVC</span></dd><dt>银行</dt><dd>${escapeHtml(record.bankName || '自定义测试银行')}</dd><dt>币种</dt><dd class="mono">${escapeHtml(record.currency || '')}</dd><dt>${escapeHtml(record.bankCodeType || '本地银行代码')}</dt><dd class="mono">${escapeHtml(record.bankCode || '')}</dd><dt>本地账户号</dt><dd class="mono">${sensitive('bankAccount')}</dd><dt>IBAN</dt><dd class="mono">${sensitive('iban')} · ${ibanStatus}</dd><dt>SWIFT / BIC</dt><dd class="mono">${sensitive('swift')} · ${bicValid(record.swift) ? 'ISO 9362 格式 ✓' : '格式未通过'}</dd></dl></section>
-      <section class="detail-section"><h3>MOCK 证件图片（OCR 测试）</h3><div class="document-preview-grid"><figure><button class="document-preview-button" data-document-open="id" type="button" aria-label="打开 ${escapeHtml(record.country)} ${escapeHtml(record.idType)} MOCK 证件大图"><canvas id="drawerIdCanvas" data-document-canvas="id" width="1000" height="630" aria-label="完整 MOCK 身份证件图片"></canvas><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>${escapeHtml(record.country)} ${escapeHtml(record.idType)} · 完整测试字段 · 点击打开大图</figcaption></figure><figure><button class="document-preview-button" data-document-open="passport" type="button" aria-label="打开 ${escapeHtml(record.country)} MOCK 护照大图"><canvas id="drawerPassportCanvas" data-document-canvas="passport" width="1000" height="630" aria-label="完整 MOCK 护照图片"></canvas><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>${escapeHtml(record.country)} Passport · 完整测试字段 · 点击打开大图</figcaption></figure></div></section>
+      <section class="detail-section"><h3>MOCK 证件图片（OCR 测试）</h3><div class="document-preview-grid"><figure><button class="document-preview-button" data-document-open="id" type="button" aria-label="打开 ${escapeHtml(record.country)} ${escapeHtml(record.idType)} MOCK 证件大图"><canvas id="drawerIdCanvas" data-document-canvas="id" width="1000" height="630" aria-label="完整 MOCK 身份证件图片"></canvas><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>${escapeHtml(record.country)} ${escapeHtml(record.idType)} · Canvas 动态渲染</figcaption></figure><figure><button class="document-preview-button" data-document-open="passport" type="button" aria-label="打开 ${escapeHtml(record.country)} MOCK 护照大图"><canvas id="drawerPassportCanvas" data-document-canvas="passport" width="1000" height="630" aria-label="完整 MOCK 护照图片"></canvas><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>${escapeHtml(record.country)} Passport · Canvas 动态渲染</figcaption></figure></div></section>
+      <section class="detail-section"><h3>Canvas 与直接图片对比</h3><p class="section-help">以下两张使用完全相同的 MOCK 字段；左侧由 Canvas 绘制，右侧通过 &lt;img src&gt; 直接引用静态图片，便于对比企业浏览器的 OCR、截图与图片识别结果。</p><div class="document-preview-grid"><figure><button class="document-preview-button" data-document-open="comparison-canvas" type="button" aria-label="打开 Canvas 对比证件大图"><canvas data-document-canvas="comparison" width="1000" height="630" aria-label="Canvas 渲染的固定 MOCK 对比证件"></canvas><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>Canvas · 固定对比字段</figcaption></figure><figure><button class="document-preview-button" data-document-open="direct-image" type="button" aria-label="打开直接引用的 MOCK 证件大图"><img src="${DIRECT_IMAGE_SRC}" alt="通过 img src 直接引用的固定 MOCK 对比证件" width="1000" height="630"><span class="document-preview-zoom" aria-hidden="true">点击放大</span></button><figcaption>&lt;img src&gt; · 静态图片直接引用</figcaption></figure></div></section>
     `;
     drawDocumentCanvas($('[data-document-canvas="id"]', $('#drawerContent')), record, 'id', !reveal);
     drawDocumentCanvas($('[data-document-canvas="passport"]', $('#drawerContent')), record, 'passport', !reveal);
+    drawDocumentCanvas($('[data-document-canvas="comparison"]', $('#drawerContent')), COMPARISON_RECORD, 'id', false);
     $('#drawerScrim').hidden = false;
     $('#detailDrawer').inert = false;
     $('#detailDrawer').classList.add('is-open');
@@ -1048,23 +1062,33 @@
   }
 
   function openDocumentPreview(kind) {
-    const record = customerById(state.drawerRecordId);
-    if (!record || !['id', 'passport'].includes(kind)) return;
+    if (!['id', 'passport', 'comparison-canvas', 'direct-image'].includes(kind)) return;
+    const isComparison = kind === 'comparison-canvas' || kind === 'direct-image';
+    const isDirectImage = kind === 'direct-image';
+    const record = isComparison ? COMPARISON_RECORD : customerById(state.drawerRecordId);
+    if (!record) return;
     const isPassport = kind === 'passport';
-    const revealed = isRevealed();
+    const revealed = isComparison || isRevealed();
     const sensitive = (field) => revealed ? String(record[field] ?? '') : maskValue(field, record[field]);
     state.documentPreviewRecordId = record.customerId;
     state.documentPreviewKind = kind;
-    $('#documentPreviewTitle').textContent = `${record.country} ${isPassport ? 'Passport' : record.idType} · MOCK 大图`;
+    $('#documentPreviewTitle').textContent = isDirectImage
+      ? '直接引用图片 · MOCK 大图'
+      : `${record.country} ${isPassport ? 'Passport' : record.idType} · ${isComparison ? 'Canvas 对比大图' : 'MOCK 大图'}`;
     $('#documentPreviewMeta').textContent = `${sensitive('name')} · ${record.customerId} · ${sensitive(isPassport ? 'passport' : 'idCard')}`;
-    if (!drawDocumentCanvas($('#documentPreviewCanvas'), record, kind, !revealed)) {
+    $('#documentPreviewCanvas').hidden = isDirectImage;
+    $('#documentPreviewImage').hidden = !isDirectImage;
+    $('#downloadDocumentPreview').textContent = isDirectImage ? '下载直接引用 SVG' : '下载当前 PNG';
+    if (isDirectImage) {
+      $('#documentPreviewImage').src = DIRECT_IMAGE_SRC;
+    } else if (!drawDocumentCanvas($('#documentPreviewCanvas'), record, isPassport ? 'passport' : 'id', !revealed)) {
       state.documentPreviewRecordId = null;
       state.documentPreviewKind = null;
       showToast('证件大图生成失败：浏览器未提供 Canvas 绘图能力');
       return;
     }
     showDialog($('#documentPreviewDialog'), '#closeDocumentPreview');
-    addLog('打开 MOCK 证件大图', isPassport ? '护照' : '身份证件');
+    addLog('打开 MOCK 证件大图', isDirectImage ? 'img 直接引用' : (isPassport ? '护照 Canvas' : '身份证件 Canvas'));
   }
 
   function closeDocumentPreview() {
@@ -1072,11 +1096,24 @@
   }
 
   async function downloadDocumentPreview() {
-    const record = customerById(state.documentPreviewRecordId);
     const kind = state.documentPreviewKind;
-    if (!record || !kind) return;
-    if (await exportPng(record, kind)) {
-      addLog('下载当前 MOCK 证件大图', kind === 'passport' ? '护照 PNG' : '身份证件 PNG');
+    if (!kind) return;
+    if (kind === 'direct-image') {
+      const link = document.createElement('a');
+      link.href = DIRECT_IMAGE_SRC;
+      link.download = 'KYC_MOCK_DIRECT_IMAGE_COMPARISON.svg';
+      document.body.append(link);
+      link.click();
+      link.remove();
+      addLog('下载当前 MOCK 证件大图', '直接引用 SVG');
+      showToast('已触发直接引用的 MOCK SVG 图片下载');
+      return;
+    }
+    const record = kind === 'comparison-canvas' ? COMPARISON_RECORD : customerById(state.documentPreviewRecordId);
+    if (!record) return;
+    const exportKind = kind === 'passport' ? 'passport' : 'id';
+    if (await exportPng(record, exportKind)) {
+      addLog('下载当前 MOCK 证件大图', exportKind === 'passport' ? '护照 PNG' : '身份证件 PNG');
       showToast('已触发当前 MOCK 证件 PNG 下载');
     }
   }
